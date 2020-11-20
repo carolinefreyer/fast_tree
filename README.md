@@ -8,6 +8,6 @@ TODO
 
 ## Contributors
 
-Caroline Freyer
-Francesca Drummer
-Pia Keukeleire 4550676
+Caroline Freyer  
+Francesca Drummer  
+Pia Keukeleire 4550676  
