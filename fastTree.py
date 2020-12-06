@@ -12,6 +12,8 @@ class FastTree(object):
         self.UPDIST = {}
         self.ACTIVE = []
         self.NODENUM = 0
+        self.TOTAL_PROFILE = []
+        self.ITERATION = 0
 
     def initialize_sequences(self, filename):
         """
@@ -20,8 +22,8 @@ class FastTree(object):
         Input:
               @seq: String of nucleotides from the alphabet A,C,G,T
         """
-        f = open(filename, 'r')
-        lines = f.readlines()
+        with open(filename, 'r') as f:
+            lines = f.readlines()
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
@@ -46,6 +48,11 @@ class FastTree(object):
                 elif seq[i] == 'T':
                     freq[3][i] = 1
             self.PROFILES[seq] = freq
+
+    def update_total_profile(self):
+        """Calculates the average of all active nodes profiles
+        :return: 4xL matrix with the average frequency count of each nucleotide over all profiles"""
+        self.TOTAL_PROFILE = self.merge_profiles(self.ACTIVE)
 
     def profile_distance(self, profile1, profile2):
         """
@@ -115,7 +122,18 @@ class FastTree(object):
         T = [[t / L for t in row] for row in T]
         return T
 
+    def relaxed_neighbor_joining(self, A):
+        """Find the closest node B to A.
+        1. Given node A find closest node B.
+        2. Given node B find closest node C
+        3. IF: Check if C == A then B is closest to A."""
+
     def neighborJoin(self):
+        # update the total profile every 200 iterations and at the beginning
+        if self.ITERATION%200 == 0:
+            self.update_total_profile()
+        self.ITERATION += 1
+        # Base case
         if len(self.ACTIVE) == 2:
             n1, n2 = self.ACTIVE[0], self.ACTIVE[1]
             dist = self.uncorrected_distance(n1,n2)
@@ -131,9 +149,11 @@ class FastTree(object):
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.UPDIST[newNode] = distances[min(distances, key=distances.get)] / 2  # UNWEIGHTED JOINS!
 
-        # Compute total profile T
+        # Compute total profile T (Franci: I created the updating step earlier, becuase in the paper they write that
+        # "FastTree computes the total profile at the beginning of Neighbor-Joining
 
-        # Find min join criterion
+
+        # Find min join criterion (Combination of FastNJ and relaxed neighbor joining)
         # Join = uncorrectedDistance(i,j) - r(i) - r(j)
         # let min_i, min_j be the nodes to join
         # create a new node with new UPDIST, CHILDREN, PROFILE values
