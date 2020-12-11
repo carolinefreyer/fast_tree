@@ -14,6 +14,7 @@ class FastTree(object):
         self.NODENUM = 0
         self.TOTAL_PROFILE = []
         self.ITERATION = 0
+        self.VARIANCE_CORR = {}
 
     def initialize_sequences(self, filename):
         """
@@ -33,6 +34,7 @@ class FastTree(object):
         for i in self.SEQUENCES:
             self.CHILDREN[i] = []
             self.UPDIST[i] = 0
+            self.VARIANCE_CORR[i] = 0
             self.ACTIVE.append(i)
 
     def initialize_profiles(self):
@@ -52,7 +54,14 @@ class FastTree(object):
     def update_total_profile(self):
         """Calculates the average of all active nodes profiles
         :return: 4xL matrix with the average frequency count of each nucleotide over all profiles"""
-        self.TOTAL_PROFILE = self.merge_profiles(self.ACTIVE)
+        seqs = self.ACTIVE
+        L = len(seqs)
+        profiles = [self.PROFILES[x] for x in seqs]
+        T = profiles[0]
+        for p in profiles[1:]:
+            T = [[sum(x) for x in zip(T[i], p[i])] for i in range(4)]
+        T = [[t / L for t in row] for row in T]
+        self.TOTAL_PROFILE = T
 
     def profile_distance(self, profile1, profile2):
         """
@@ -87,7 +96,30 @@ class FastTree(object):
         profileI, profileJ = self.PROFILES[i], self.PROFILES[j]
         return self.profile_distance(profileI, profileJ) - self.UPDIST[i] - self.UPDIST[j]
 
-    def out_distance(self, profile, T, i, n):
+    def compute_variance(self, i, j):
+        """
+        Calculates the variance used to compute the weights of the joins.
+        """
+        profileI, profileJ = self.PROFILES[i], self.PROFILES[j]
+        return self.profile_distance(profileI, profileJ) - self.VARIANCE_CORR[i] - self.VARIANCE_CORR[j]
+
+    def compute_weight(self, i, j, n):
+        """
+        Calculates the weight of 2 nodes when joining.
+        :param i: node 1
+        :param j: node 2
+        :param n: the number of active nodes before joining
+        :return: the weight of the 2 nodes relative to each other
+        """
+        T = self.TOTAL_PROFILE
+        prof_i, prof_j = self.PROFILES[i], self.PROFILES[j]
+        # This code will look confusing, but check page 11 of "the better paper" to find the full formula
+        numerator = (n - 2) * (self.VARIANCE_CORR[i] - self.VARIANCE_CORR[j]) + n * self.profile_distance(prof_j, T) \
+                    - n * self.profile_distance(prof_i, T)
+        lambd = 0.5 + numerator / (2 * (n - 2) * self.compute_variance(i, j))
+        return lambd
+
+    def out_distance(self, profile, i):
         """
         Calculates the out-distance for node i
         r(i) = (n*delta(profile,T) - delta(i,i) - (n-1)*upDist(i)-sum_{k =\=i} upDist(k))/(n-2)
@@ -96,31 +128,41 @@ class FastTree(object):
                @i: node number
                @n: number of active nodes
         """
-        deltaii = 0
-        normaliser = 0
-        for c1 in range(len(self.CHILDREN[i])):
-            for c2 in range(c1, len(self.CHILDREN[i])):
-                normaliser += 1
-                deltaii += self.profile_distance(self.PROFILES[c1], self.PROFILES[c2])
-        if normaliser != 0:
-            deltaii = deltaii / normaliser
+        T = self.TOTAL_PROFILE
+        n = len(self.ACTIVE)
+        deltaii = self.get_avg_dist_from_children(i)
         return (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
                 - sum(list(self.UPDIST.values()))) / (n - 2)
 
-    def merge_profiles(self, seqs):
+    # I put this in a separate function because I thought I needed it too but I don't in the end but oh well..
+    def get_avg_dist_from_children(self, i):
         """
-        Calculates the profile of multiple sequences by "merging" their profiles.
-        This method can be used to calculate the total profile by inputting all sequences.
-        Input: @seqs: the sequences whose profiles will be merged
+        :param i: the node to calculate avg distance of
+        :return: the avg distance between node i and its children
+        """
+        deltaii = 0
+        normaliser = 0
+        children = self.CHILDREN[i]
+        for c1 in range(len(children)):
+            for c2 in range(c1, len(children)):
+                normaliser += 1
+                deltaii += self.profile_distance(self.PROFILES[children[c1]], self.PROFILES[children[c2]])
+        if normaliser != 0:
+            deltaii = deltaii / normaliser
+        return deltaii
 
+    def merge_profiles(self, seq1, seq2, weight=0.5):
         """
-        L = len(seqs)
-        profiles = [self.PROFILES[x] for x in seqs]
-        T = profiles[0]
-        for p in profiles[1:]:
-            T = [[sum(x) for x in zip(T[i], p[i])] for i in range(4)]
-        T = [[t / L for t in row] for row in T]
-        return T
+        Calculates the weighted profile of 2 nodes
+        :param seq1: the first node
+        :param seq2: the second node
+        :param weight: the weight of the first node in the join of the 2 nodes. default = 0.5 (unweighted)
+        :return: the merged profile of the 2 nodes
+        """
+        prof1, prof2 = np.array(self.PROFILES[seq1]), np.array(self.PROFILES[seq2])
+        prof1 *= weight
+        prof2 *= (1 - weight)
+        return np.add(prof1, prof2).tolist()
 
     def relaxed_neighbor_joining(self, A):
         """Find the closest node B to A.
@@ -128,36 +170,52 @@ class FastTree(object):
         2. Given node B find closest node C
         3. IF: Check if C == A then B is closest to A."""
 
+    def neighbor_join_criterion(self, i, j):
+        """Get the neighbor join criterion d_u(i,j)-r(i)-r(j) which should be minimized for each join"""
+        prof_i, prof_j = self.PROFILES[i], self.PROFILES[j]
+        return self.uncorrected_distance(i, j) - self.out_distance(prof_i, i) - self.out_distance(prof_j, j)
+
+    def get_updist(self, i, j, weight):
+        """
+        This method calculates the up-distance after a weighted join of nodes i and j
+        :param i: first node that was joined
+        :param j: second node that was joined
+        :param weight: the weight of node i in the join
+        :return: the up-distance of the joined node ij
+        """
+        out_i = self.out_distance(self.PROFILES[i], i)
+        out_j = self.out_distance(self.PROFILES[j], j)
+        du_i_ij = (self.uncorrected_distance(i, j) + out_i - out_j) / 2
+        du_j_ij = (self.uncorrected_distance(i, j) + out_j - out_i) / 2
+        u_ij = weight * (self.UPDIST[i] + du_i_ij) + (1 - weight) * (self.UPDIST[j] + du_j_ij)
+        return u_ij
+
     def neighborJoin(self):
+        n = len(self.ACTIVE)
         # update the total profile every 200 iterations and at the beginning
-        if self.ITERATION%200 == 0:
+        if self.ITERATION % 200 == 0:
             self.update_total_profile()
         self.ITERATION += 1
         # Base case
-        if len(self.ACTIVE) == 2:
+        if n == 2:
             n1, n2 = self.ACTIVE[0], self.ACTIVE[1]
-            dist = self.uncorrected_distance(n1,n2)
+            dist = self.uncorrected_distance(n1, n2)
             self.CHILDREN[(n1, n2)] = [n1, n2]
             self.UPDIST[(n1, n2)] = dist / 2
             # Add to tree & return tree - not sure about the data structure for this
-        distances = {(i, j): self.uncorrected_distance(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
+        distances = {(i, j): self.neighbor_join_criterion(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
         newNode = min(distances, key=distances.get)
         i, j = newNode
+        weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
-        self.PROFILES[newNode] = self.merge_profiles([i, j])
+        self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
+        # self.incr_total_profile(i,j,newNode)
+        self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
+            + np.array(self.PROFILES[newNode]) / (n - 1)
         self.ACTIVE.append(newNode)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
-        self.UPDIST[newNode] = distances[min(distances, key=distances.get)] / 2  # UNWEIGHTED JOINS!
-
+        self.UPDIST[newNode] = self.get_updist(i, j, weight)
+        self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
+            + weight * (1 - weight) * self.compute_variance(i, j)
         # Compute total profile T (Franci: I created the updating step earlier, becuase in the paper they write that
         # "FastTree computes the total profile at the beginning of Neighbor-Joining
-
-
-        # Find min join criterion (Combination of FastNJ and relaxed neighbor joining)
-        # Join = uncorrectedDistance(i,j) - r(i) - r(j)
-        # let min_i, min_j be the nodes to join
-        # create a new node with new UPDIST, CHILDREN, PROFILE values
-        # remove min_i and min_j from active list & add new node
-        # recursive call
-        # add nodes to tree
-        # return tree
