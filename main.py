@@ -4,9 +4,9 @@ import fastTree as ft
 def run():
     tree = ft.FastTree()
     tree.initialize_sequences('fasttree-reallysmall.aln')
-    tree.initialize_profiles()
-    while len(tree.ACTIVE) > 1:
-        tree.neighborJoin()
-    return tree.CHILDREN
 
-print(run())
+    tree.initialize_profiles()
+
+    while(len(tree.ACTIVE)>1):
+        tree.neighborJoin()
+run()

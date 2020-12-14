@@ -194,6 +194,7 @@ class FastTree(object):
         return u_ij
 
     def neighborJoin(self):
+
         n = len(self.ACTIVE)
         # update the total profile every 200 iterations and at the beginning
         if self.ITERATION % 200 == 0:
@@ -205,26 +206,29 @@ class FastTree(object):
             dist = self.uncorrected_distance(n1, n2)
             self.CHILDREN[(n1, n2)] = [n1, n2]
             self.UPDIST[(n1, n2)] = dist / 2
+            self.ACTIVE.remove(n1), self.ACTIVE.remove(n2)
+            self.ACTIVE.append((n1,n2))
+            return
             # Add to tree & return tree - not sure about the data structure for this
 
         #Find min join criterion
+
         distances = {(i, j): self.neighbor_join_criterion(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
         newNode = min(distances, key=distances.get)
         i, j = newNode
-
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
         # self.incr_total_profile(i,j,newNode)
         self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
             + np.array(self.PROFILES[newNode]) / (n - 1)
-        self.ACTIVE.append(newNode)
-        self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.UPDIST[newNode] = self.get_updist(i, j, weight)
         self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
             + weight * (1 - weight) * self.compute_variance(i, j)
+        self.ACTIVE.append(newNode)
+        self.ACTIVE.remove(i), self.ACTIVE.remove(j)
 
-
+        return
 
 
         # Compute total profile T (Franci: I created the updating step earlier, becuase in the paper they write that
