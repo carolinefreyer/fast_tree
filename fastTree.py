@@ -6,6 +6,7 @@ ACGT_DIS = [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
 
 class FastTree(object):
     def __init__(self):
+        #Dictionary holding sequences indexed by name
         self.SEQUENCES = {}
         self.PROFILES = {}
         self.CHILDREN = {}
@@ -18,26 +19,29 @@ class FastTree(object):
 
     def initialize_sequences(self, filename):
         """
-        Returns a 4 by L matrix with the frequency of each nulceotide at each position
+        Initialised variables based on input file
 
-        Input:
-              @seq: String of nucleotides from the alphabet A,C,G,T
+        Input: @filename: String
         """
+
         with open(filename, 'r') as f:
             lines = f.readlines()
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
             self.SEQUENCES[tmp2] = tmp1
-            # @ Caroline: I swapped the keys and values of the sequences dict, as it is easier (the actual
-            # sequence is used much more often than its name)
         for i in self.SEQUENCES:
             self.CHILDREN[i] = []
+            #Updist and variance correction zero for all leaves
             self.UPDIST[i] = 0
             self.VARIANCE_CORR[i] = 0
             self.ACTIVE.append(i)
 
+
     def initialize_profiles(self):
+        """
+            Sets the profile for each sequence
+        """
         for seq in self.SEQUENCES:
             freq = np.zeros((4, len(seq)))
             for i in range(len(seq)):
@@ -124,7 +128,6 @@ class FastTree(object):
         Calculates the out-distance for node i
         r(i) = (n*delta(profile,T) - delta(i,i) - (n-1)*upDist(i)-sum_{k =\=i} upDist(k))/(n-2)
         Input: @profile: profile of node i
-               @T: total profile
                @i: node number
                @n: number of active nodes
         """
@@ -134,7 +137,7 @@ class FastTree(object):
         return (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
                 - sum(list(self.UPDIST.values()))) / (n - 2)
 
-    # I put this in a separate function because I thought I needed it too but I don't in the end but oh well..
+
     def get_avg_dist_from_children(self, i):
         """
         :param i: the node to calculate avg distance of
@@ -203,9 +206,12 @@ class FastTree(object):
             self.CHILDREN[(n1, n2)] = [n1, n2]
             self.UPDIST[(n1, n2)] = dist / 2
             # Add to tree & return tree - not sure about the data structure for this
+
+        #Find min join criterion
         distances = {(i, j): self.neighbor_join_criterion(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
         newNode = min(distances, key=distances.get)
         i, j = newNode
+
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
@@ -217,5 +223,9 @@ class FastTree(object):
         self.UPDIST[newNode] = self.get_updist(i, j, weight)
         self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
             + weight * (1 - weight) * self.compute_variance(i, j)
+
+
+
+
         # Compute total profile T (Franci: I created the updating step earlier, becuase in the paper they write that
         # "FastTree computes the total profile at the beginning of Neighbor-Joining
