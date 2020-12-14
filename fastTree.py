@@ -6,7 +6,7 @@ ACGT_DIS = [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
 
 class FastTree(object):
     def __init__(self):
-        #Dictionary holding sequences indexed by name
+        # Dictionary holding sequences indexed by name
         self.SEQUENCES = {}
         self.PROFILES = {}
         self.CHILDREN = {}
@@ -32,11 +32,10 @@ class FastTree(object):
             self.SEQUENCES[tmp2] = tmp1
         for i in self.SEQUENCES:
             self.CHILDREN[i] = []
-            #Updist and variance correction zero for all leaves
+            # Updist and variance correction zero for all leaves
             self.UPDIST[i] = 0
             self.VARIANCE_CORR[i] = 0
             self.ACTIVE.append(i)
-
 
     def initialize_profiles(self):
         """
@@ -119,8 +118,9 @@ class FastTree(object):
         prof_i, prof_j = self.PROFILES[i], self.PROFILES[j]
         # This code will look confusing, but check page 11 of "the better paper" to find the full formula
         numerator = (n - 2) * (self.VARIANCE_CORR[i] - self.VARIANCE_CORR[j]) + n * self.profile_distance(prof_j, T) \
-                    - n * self.profile_distance(prof_i, T)
+                    - n * self.profile_distance(prof_i, T) +self.profile_distance(prof_i,prof_i) - self.profile_distance(prof_j,prof_j)
         lambd = 0.5 + numerator / (2 * (n - 2) * self.compute_variance(i, j))
+
         return lambd
 
     def out_distance(self, profile, i):
@@ -136,7 +136,6 @@ class FastTree(object):
         deltaii = self.get_avg_dist_from_children(i)
         return (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
                 - sum(list(self.UPDIST.values()))) / (n - 2)
-
 
     def get_avg_dist_from_children(self, i):
         """
@@ -207,12 +206,10 @@ class FastTree(object):
             self.CHILDREN[(n1, n2)] = [n1, n2]
             self.UPDIST[(n1, n2)] = dist / 2
             self.ACTIVE.remove(n1), self.ACTIVE.remove(n2)
-            self.ACTIVE.append((n1,n2))
+            self.ACTIVE.append((n1, n2))
             return
-            # Add to tree & return tree - not sure about the data structure for this
 
-        #Find min join criterion
-
+        # Find min join criterion
         distances = {(i, j): self.neighbor_join_criterion(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
         newNode = min(distances, key=distances.get)
         i, j = newNode
@@ -221,15 +218,10 @@ class FastTree(object):
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
         # self.incr_total_profile(i,j,newNode)
         self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
-            + np.array(self.PROFILES[newNode]) / (n - 1)
+                              + np.array(self.PROFILES[newNode]) / (n - 1)
         self.UPDIST[newNode] = self.get_updist(i, j, weight)
         self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
-            + weight * (1 - weight) * self.compute_variance(i, j)
+                                      + weight * (1 - weight) * self.compute_variance(i, j)
         self.ACTIVE.append(newNode)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
-
         return
-
-
-        # Compute total profile T (Franci: I created the updating step earlier, becuase in the paper they write that
-        # "FastTree computes the total profile at the beginning of Neighbor-Joining

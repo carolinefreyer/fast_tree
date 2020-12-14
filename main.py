@@ -6,7 +6,7 @@ def run():
     tree.initialize_sequences('fasttree-reallysmall.aln')
 
     tree.initialize_profiles()
-
     while(len(tree.ACTIVE)>1):
         tree.neighborJoin()
+    print(tree.ACTIVE)
 run()
