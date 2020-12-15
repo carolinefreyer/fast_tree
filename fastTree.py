@@ -30,18 +30,12 @@ class FastTree(object):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
             self.SEQUENCES[tmp2] = tmp1
-        for i in self.SEQUENCES:
-            self.CHILDREN[i] = []
-            # Updist and variance correction zero for all leaves
-            self.UPDIST[i] = 0
-            self.VARIANCE_CORR[i] = 0
-            self.ACTIVE.append(i)
-
-    def initialize_profiles(self):
-        """
-            Sets the profile for each sequence
-        """
         for seq in self.SEQUENCES:
+            self.CHILDREN[seq] = []
+            # Updist and variance correction zero for all leaves
+            self.UPDIST[seq] = 0
+            self.VARIANCE_CORR[seq] = 0
+            self.ACTIVE.append(seq)
             freq = np.zeros((4, len(seq)))
             for i in range(len(seq)):
                 if seq[i] == 'A':
@@ -118,9 +112,10 @@ class FastTree(object):
         prof_i, prof_j = self.PROFILES[i], self.PROFILES[j]
         # This code will look confusing, but check page 11 of "the better paper" to find the full formula
         numerator = (n - 2) * (self.VARIANCE_CORR[i] - self.VARIANCE_CORR[j]) + n * self.profile_distance(prof_j, T) \
-                    - n * self.profile_distance(prof_i, T) +self.profile_distance(prof_i,prof_i) - self.profile_distance(prof_j,prof_j)
+                    - self.get_avg_dist_from_children(j) - n * self.profile_distance(prof_i, T) \
+                    + self.get_avg_dist_from_children(i)
         lambd = 0.5 + numerator / (2 * (n - 2) * self.compute_variance(i, j))
-
+        print(lambd)
         return lambd
 
     def out_distance(self, profile, i):
@@ -135,7 +130,7 @@ class FastTree(object):
         n = len(self.ACTIVE)
         deltaii = self.get_avg_dist_from_children(i)
         return (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
-                - sum(list(self.UPDIST.values()))) / (n - 2)
+                - sum(list(self.UPDIST[x] for x in self.ACTIVE))) / (n - 2)
 
     def get_avg_dist_from_children(self, i):
         """
@@ -201,10 +196,11 @@ class FastTree(object):
         self.ITERATION += 1
         # Base case
         if n == 2:
+            # Pia: I don't think it makes sense to calculate the weights, up and out distances for the last join.
+            # The formulas don't work with n=2 (division by 0) but we also don't need that info anymore after joining
+            # everything. I think.
             n1, n2 = self.ACTIVE[0], self.ACTIVE[1]
-            dist = self.uncorrected_distance(n1, n2)
             self.CHILDREN[(n1, n2)] = [n1, n2]
-            self.UPDIST[(n1, n2)] = dist / 2
             self.ACTIVE.remove(n1), self.ACTIVE.remove(n2)
             self.ACTIVE.append((n1, n2))
             return
@@ -217,11 +213,13 @@ class FastTree(object):
         self.CHILDREN[newNode] = [i, j]
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
         # self.incr_total_profile(i,j,newNode)
-        self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
-                              + np.array(self.PROFILES[newNode]) / (n - 1)
+        # self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
+        #                       + np.array(self.PROFILES[newNode]) / (n - 1)
         self.UPDIST[newNode] = self.get_updist(i, j, weight)
         self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
                                       + weight * (1 - weight) * self.compute_variance(i, j)
         self.ACTIVE.append(newNode)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
+        self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
+                              + np.array(self.PROFILES[newNode])) / (n - 1)
         return
