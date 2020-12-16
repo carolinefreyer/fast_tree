@@ -126,27 +126,27 @@ class FastTree(object):
                @i: node number
                @n: number of active nodes
         """
+
         T = self.TOTAL_PROFILE
         n = len(self.ACTIVE)
         deltaii = self.get_avg_dist_from_children(i)
-        return (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
+        ans = (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
                 - sum(list(self.UPDIST[x] for x in self.ACTIVE))) / (n - 2)
+        return ans
 
     def get_avg_dist_from_children(self, i):
         """
         :param i: the node to calculate avg distance of
         :return: the avg distance between node i and its children
         """
-        deltaii = 0
-        normaliser = 0
+        deltaii = self.profile_distance(self.PROFILES[i], self.PROFILES[i])
+        normaliser = 1
         children = self.CHILDREN[i]
         for c1 in range(len(children)):
             for c2 in range(c1, len(children)):
                 normaliser += 1
                 deltaii += self.profile_distance(self.PROFILES[children[c1]], self.PROFILES[children[c2]])
-        if normaliser != 0:
-            deltaii = deltaii / normaliser
-        return deltaii
+        return deltaii / normaliser
 
     def merge_profiles(self, seq1, seq2, weight=0.5):
         """
@@ -216,8 +216,10 @@ class FastTree(object):
         # self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
         #                       + np.array(self.PROFILES[newNode]) / (n - 1)
         self.UPDIST[newNode] = self.get_updist(i, j, weight)
+
         self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
                                       + weight * (1 - weight) * self.compute_variance(i, j)
+
         self.ACTIVE.append(newNode)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])

@@ -6,5 +6,6 @@ def run():
     tree.initialize_sequences('fasttree-reallysmall.aln')
     while(len(tree.ACTIVE)>1):
         tree.neighborJoin()
+
     print(tree.ACTIVE)
 run()
