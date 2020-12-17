@@ -29,25 +29,24 @@ class FastTree(object):
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
-            self.SEQUENCES[tmp2] = tmp1
+            self.SEQUENCES[tmp1] = tmp2
         for seq in self.SEQUENCES:
             self.CHILDREN[seq] = []
             # Updist and variance correction zero for all leaves
             self.UPDIST[seq] = 0
             self.VARIANCE_CORR[seq] = 0
             self.ACTIVE.append(seq)
-            freq = np.zeros((4, len(seq)))
-            for i in range(len(seq)):
-                if seq[i] == 'A':
+            freq = np.zeros((4, len(self.SEQUENCES[seq])))
+            for i in range(len(self.SEQUENCES[seq])):
+                if self.SEQUENCES[seq][i] == 'A':
                     freq[0][i] = 1
-                elif seq[i] == 'C':
+                elif self.SEQUENCES[seq][i] == 'C':
                     freq[1][i] = 1
-                elif seq[i] == 'G':
+                elif self.SEQUENCES[seq][i] == 'G':
                     freq[2][i] = 1
-                elif seq[i] == 'T':
+                elif self.SEQUENCES[seq][i] == 'T':
                     freq[3][i] = 1
             self.PROFILES[seq] = freq
-
     def update_total_profile(self):
         """Calculates the average of all active nodes profiles
         :return: 4xL matrix with the average frequency count of each nucleotide over all profiles"""
@@ -68,8 +67,8 @@ class FastTree(object):
                 sum(j,k in {A,C,G,T}) freq(p1[i]==j)*freq(p2[i]==k)*ACGT_dis[j][k]
 
         The profile distance is the average distance between profile characters over all positions.
-        Input: @profile1: 4xL matrix profile
-               @profile2: 4xL matrix profile
+        :param profile1: 4xL matrix profile
+        :param profile2: 4xL matrix profile
         """
         d = 0
         # Length of sequence
@@ -85,13 +84,22 @@ class FastTree(object):
         Calculates the uncorrected distance between two profiles, without gaps
         d_u(i,j) = delta(i,j)-upDist(i)-upDist(j)
 
-        Input: @i
-               @j
-               @profileI: profile of node i
-               @profileJ: profile of node j
+        :param i: node 1
+        :param j: node 2
         """
         profileI, profileJ = self.PROFILES[i], self.PROFILES[j]
         return self.profile_distance(profileI, profileJ) - self.UPDIST[i] - self.UPDIST[j]
+
+    def corrected_distances(self, i, j):
+        """
+        Calculates the corrected distances between two nodes
+        d = -3/4 log(1-4/3 d_u)
+        Note: truncated to a maximum of 3
+
+        :param i: node 1
+        :param j: node 2
+        """
+        return min(-3/4 *np.log(1-4/3*self.uncorrected_distance(i,j)),3)
 
     def compute_variance(self, i, j):
         """
@@ -115,7 +123,6 @@ class FastTree(object):
                     - self.get_avg_dist_from_children(j) - n * self.profile_distance(prof_i, T) \
                     + self.get_avg_dist_from_children(i)
         lambd = 0.5 + numerator / (2 * (n - 2) * self.compute_variance(i, j))
-        print(lambd)
         return lambd
 
     def out_distance(self, profile, i):
@@ -200,7 +207,8 @@ class FastTree(object):
             # The formulas don't work with n=2 (division by 0) but we also don't need that info anymore after joining
             # everything. I think.
             n1, n2 = self.ACTIVE[0], self.ACTIVE[1]
-            self.CHILDREN[(n1, n2)] = [n1, n2]
+            self.CHILDREN[n1].append(n2)
+            self.CHILDREN[n2].append(n1)
             self.ACTIVE.remove(n1), self.ACTIVE.remove(n2)
             self.ACTIVE.append((n1, n2))
             return
@@ -224,4 +232,54 @@ class FastTree(object):
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
                               + np.array(self.PROFILES[newNode])) / (n - 1)
+        return
+
+    def getEdges(self, list, edges):
+        i = list[0]
+        j = list[1]
+        edges.append([i, j])
+        if type(i) is str and type(j) is str:
+            return edges
+        if type(i) is str:
+            edges.append(self.getEdges(j, edges))
+        elif type(j) is str:
+            edges.append(self.getEdges(i,edges))
+        else:
+            edges.append(self.getEdges(i, edges))
+            edges.append(self.getEdges(j, edges))
+        return edges
+
+    def nearestNeighbourInterchange(self):
+        end = int(np.log2(len(self.SEQUENCES)) + 1)
+        edgesInternal = []
+        for i in self.CHILDREN:
+            for j in self.CHILDREN[i]:
+                if j not in self.SEQUENCES:
+                    edgesInternal.append([i,j])
+        for i in edgesInternal:
+            A = i[0][0]
+            B = i[0][1]
+            C = i[1][0]
+            D = i[1][1]
+            #root of tree
+            if i[1] in self.CHILDREN[i[0]] and i[0] not in self.CHILDREN[i[1]]:
+                if i[1] == i[0][0]:
+                    A = i[0][1]
+                else:
+                    A = i[0][0]
+                for j in self.CHILDREN:
+                    if i[0] in self.CHILDREN[j]:
+                        B = j
+            if i[0] in self.CHILDREN[i[1]] and i[1] not in self.CHILDREN[i[0]]:
+                if i[0] == i[1][0]:
+                    C = i[1][1]
+                else:
+                    C = i[1][0]
+                for j in self.CHILDREN:
+                    if i[1] in self.CHILDREN[j]:
+                        D = j
+            #Compute profiles
+            #check condition
+            #if true, make exchange.
+
         return
