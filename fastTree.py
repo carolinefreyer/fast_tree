@@ -1,4 +1,5 @@
 import numpy as np
+from random import choice
 
 # Disimilarity matrix between the alphabet A,C,G,T
 ACGT_DIS = [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
@@ -17,7 +18,7 @@ class FastTree(object):
         self.ITERATION = 0
         self.VARIANCE_CORR = {}
 
-    def initialize_sequences(self, filename):
+    def initialize_sequences(self, filename, **kwargs):
         """
         Initialised variables based on input file
 
@@ -26,10 +27,20 @@ class FastTree(object):
 
         with open(filename, 'r') as f:
             lines = f.readlines()
+        # Check if top-hits heuristics should be applied
+        bool_top_hits = kwargs.get('top_hits', None)
+        # initialize sequences from file
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
             self.SEQUENCES[tmp2] = tmp1
+        # With top-hits heuristic: Take an arbitrary "seed" sequence
+        if bool_top_hits:
+            print("Top hits true")
+            DNA_seed = ''.join(choice('TAGC') for _ in range(len(list(self.SEQUENCES.keys())[0])))
+            print(DNA_seed)
+            self.SEQUENCES[DNA_seed] = "Seed"
+            print(self.SEQUENCES)
         for seq in self.SEQUENCES:
             self.CHILDREN[seq] = []
             # Updist and variance correction zero for all leaves
@@ -186,6 +197,30 @@ class FastTree(object):
         du_j_ij = (self.uncorrected_distance(i, j) + out_j - out_i) / 2
         u_ij = weight * (self.UPDIST[i] + du_i_ij) + (1 - weight) * (self.UPDIST[j] + du_j_ij)
         return u_ij
+
+    def initialize_top_hits(self):
+        """
+        Calculates the top-hits lists for each sequence.
+        :return: N top-hits lists
+        """
+        """
+        # Take an arbitrary "seed" sequence
+        print(self.SEQUENCES)
+        DNA_seed = ''.join(choice('TAGC') for _ in range(len(list(self.SEQUENCES.keys())[0])))
+        print(DNA_seed)
+        """
+        # retrieve random seed
+        key_list = list(self.SEQUENCES.keys())
+        val_list = list(self.SEQUENCES.values())
+        DNA_seed = key_list[val_list.index("Seed")]
+        # Compare seed to all other sequences using Neighbor-joining critera
+        for sequence in self.SEQUENCES.keys():
+            if DNA_seed != sequence:
+                self.neighbor_join_criterion(DNA_seed, sequence)
+                print("finished")
+        # delete seed from Sequences list
+        del self.SEQUENCES["Seed"]
+
 
     def neighborJoin(self):
 
