@@ -1,5 +1,5 @@
 import numpy as np
-from random import choice
+import math
 
 # Disimilarity matrix between the alphabet A,C,G,T
 ACGT_DIS = [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
@@ -17,8 +17,9 @@ class FastTree(object):
         self.TOTAL_PROFILE = []
         self.ITERATION = 0
         self.VARIANCE_CORR = {}
+        self.TOP_HITS = {}
 
-    def initialize_sequences(self, filename, **kwargs):
+    def initialize_sequences(self, filename):
         """
         Initialised variables based on input file
 
@@ -27,20 +28,11 @@ class FastTree(object):
 
         with open(filename, 'r') as f:
             lines = f.readlines()
-        # Check if top-hits heuristics should be applied
-        bool_top_hits = kwargs.get('top_hits', None)
         # initialize sequences from file
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
             self.SEQUENCES[tmp2] = tmp1
-        # With top-hits heuristic: Take an arbitrary "seed" sequence
-        if bool_top_hits:
-            print("Top hits true")
-            DNA_seed = ''.join(choice('TAGC') for _ in range(len(list(self.SEQUENCES.keys())[0])))
-            print(DNA_seed)
-            self.SEQUENCES[DNA_seed] = "Seed"
-            print(self.SEQUENCES)
         for seq in self.SEQUENCES:
             self.CHILDREN[seq] = []
             # Updist and variance correction zero for all leaves
@@ -198,28 +190,36 @@ class FastTree(object):
         u_ij = weight * (self.UPDIST[i] + du_i_ij) + (1 - weight) * (self.UPDIST[j] + du_j_ij)
         return u_ij
 
+    def initialize_nodes_tophits(self, node, distances, m):
+        """
+        Updates self.TOP_HITS with the m top-hits for the node given its closest neighbours in sorted_distances
+        :param distances: dictionary with a key tuple (node, neighbor) and the distance as value
+        :param m: number of top-hits to be initialized
+        """
+        sorted_distances = sorted(distances.keys(), key=lambda item: distances[item])
+        for i in range(m):
+            neighbor = sorted_distances[i][1]
+            if node not in self.TOP_HITS:
+                self.TOP_HITS.update({node:[neighbor]})
+            else:
+                self.TOP_HITS[node].append(neighbor)
+
     def initialize_top_hits(self):
         """
-        Calculates the top-hits lists for each sequence.
-        :return: N top-hits lists
+        Updates the self.TOP_HITS for node A with the minimum UPDIST and all nodes within node A's top-hits list
         """
-        """
-        # Take an arbitrary "seed" sequence
-        print(self.SEQUENCES)
-        DNA_seed = ''.join(choice('TAGC') for _ in range(len(list(self.SEQUENCES.keys())[0])))
-        print(DNA_seed)
-        """
-        # retrieve random seed
-        key_list = list(self.SEQUENCES.keys())
-        val_list = list(self.SEQUENCES.values())
-        DNA_seed = key_list[val_list.index("Seed")]
-        # Compare seed to all other sequences using Neighbor-joining critera
-        for sequence in self.SEQUENCES.keys():
-            if DNA_seed != sequence:
-                self.neighbor_join_criterion(DNA_seed, sequence)
-                print("finished")
-        # delete seed from Sequences list
-        del self.SEQUENCES["Seed"]
+        # sequence with minimal out distance (and gaps)
+        node_A = sorted(self.UPDIST.keys(), key=lambda item: self.UPDIST[item])[0]
+        # find top-hits list for node A
+        self.update_total_profile() # Maybe move this to initialize_sequences()
+        distances_A = {(node_A, j): self.neighbor_join_criterion(node_A, j) for j in self.ACTIVE if node_A != j}
+        m = int(math.sqrt(len(self.SEQUENCES))) #not sure about how to calcuate m
+        self.initialize_nodes_tophits(node_A, distances_A, 2*m)
+        # evaluate top-hits for m neighbours within node A's top-hits
+        for i in range(m):
+            node_B = self.TOP_HITS[node_A][0]
+            distances_B = {(node_B, j): self.neighbor_join_criterion(node_A, j) for j in self.TOP_HITS[node_A] if node_B != j}
+            self.initialize_nodes_tophits(node_B, distances_B, m)
 
 
     def neighborJoin(self):
