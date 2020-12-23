@@ -208,19 +208,32 @@ class FastTree(object):
         """
         Updates the self.TOP_HITS for node A with the minimum UPDIST and all nodes within node A's top-hits list
         """
-        # sequence with minimal out distance (and gaps)
-        node_A = sorted(self.UPDIST.keys(), key=lambda item: self.UPDIST[item])[0]
-        # find top-hits list for node A
+        # 1: select sequence with minimal out distance (and gaps)
+        nodeA = sorted(self.UPDIST.keys(), key=lambda item: self.UPDIST[item])[0]
+        # 2: find top-hits list for node A
         self.update_total_profile() # Maybe move this to initialize_sequences()
-        distances_A = {(node_A, j): self.neighbor_join_criterion(node_A, j) for j in self.ACTIVE if node_A != j}
+        distances_A = {(nodeA, j): self.neighbor_join_criterion(nodeA, j) for j in self.ACTIVE if nodeA != j}
         m = int(math.sqrt(len(self.SEQUENCES))) #not sure about how to calcuate m
-        self.initialize_nodes_tophits(node_A, distances_A, 2*m)
-        # evaluate top-hits for m neighbours within node A's top-hits
+        self.initialize_nodes_tophits(nodeA, distances_A, 2*m)
+        # 3: evaluate top-hits for m neighbours within node A's top-hits
         for i in range(m):
-            node_B = self.TOP_HITS[node_A][0]
-            distances_B = {(node_B, j): self.neighbor_join_criterion(node_A, j) for j in self.TOP_HITS[node_A] if node_B != j}
-            self.initialize_nodes_tophits(node_B, distances_B, m)
+            nodeB = self.TOP_HITS[nodeA][i]
+            distances_B = {(nodeB, j): self.neighbor_join_criterion(nodeA, j) for j in self.TOP_HITS[nodeA] if nodeB != j}
+            self.initialize_nodes_tophits(nodeB, distances_B, m)
 
+    def update_tophits(self, newNode):
+        """
+        This function compute the top-hits list for the newNode by comparing if to all entries in the top-hits lists of its children.
+        :param newNode: tuple with children nodes
+        :return:
+        """
+        nodeA, nodeB = newNode
+        if nodeA in self.TOP_HITS.keys() and nodeB in self.TOP_HITS.keys(): # safety check, can be removed later
+            top_hitsA = self.TOP_HITS.get(nodeA)
+            top_hitsB = self.TOP_HITS.get(nodeB)
+            top_hitsA.remove(nodeB), top_hitsB.remove(nodeA)
+            candidates = top_hitsA + top_hitsB
+            distances_A = {(newNode, j): self.neighbor_join_criterion(nodeA, j) for j in self.ACTIVE if nodeA != j}
 
     def neighborJoin(self):
 
@@ -243,6 +256,8 @@ class FastTree(object):
         # Find min join criterion
         distances = {(i, j): self.neighbor_join_criterion(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
         newNode = min(distances, key=distances.get)
+        # TODO: Place at appropriate position and incoorparate into joining function
+        self.update_tophits(newNode)
         i, j = newNode
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
