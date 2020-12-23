@@ -229,11 +229,14 @@ class FastTree(object):
         """
         nodeA, nodeB = newNode
         if nodeA in self.TOP_HITS.keys() and nodeB in self.TOP_HITS.keys(): # safety check, can be removed later
-            top_hitsA = self.TOP_HITS.get(nodeA)
-            top_hitsB = self.TOP_HITS.get(nodeB)
-            top_hitsA.remove(nodeB), top_hitsB.remove(nodeA)
-            candidates = top_hitsA + top_hitsB
-            distances_A = {(newNode, j): self.neighbor_join_criterion(nodeA, j) for j in self.ACTIVE if nodeA != j}
+            top_hitsA = self.TOP_HITS.get(nodeA).remove(nodeB)
+            top_hitsB = self.TOP_HITS.get(nodeB).remove(nodeA)
+            candidates = list(set(top_hitsA + top_hitsB)) # remove duplicates
+            distances = {(newNode, j): self.neighbor_join_criterion(nodeA, j) for j in candidates}
+            m = int(math.sqrt(len(self.SEQUENCES))) # m can decrease what to do about that?
+            self.initialize_nodes_tophits(self, newNode, distances, m)
+            # TODO: compare each of the new nodes top-hits to each other (NOTE: pay attention that they are not double added to the top hits)
+            # TODO: for all other nodes that either have nodeA or nodeB in their tophits replace with newNode
 
     def neighborJoin(self):
 
