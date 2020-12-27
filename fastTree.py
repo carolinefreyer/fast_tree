@@ -29,22 +29,23 @@ class FastTree(object):
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
-            self.SEQUENCES[tmp2] = tmp1
+            self.SEQUENCES[tmp1] = tmp2
         for seq in self.SEQUENCES:
             self.CHILDREN[seq] = []
             # Updist and variance correction zero for all leaves
             self.UPDIST[seq] = 0
             self.VARIANCE_CORR[seq] = 0
             self.ACTIVE.append(seq)
-            freq = np.zeros((4, len(seq)))
-            for i in range(len(seq)):
-                if seq[i] == 'A':
+            s = self.SEQUENCES[seq]
+            freq = np.zeros((4, len(s)))
+            for i in range(len(s)):
+                if s[i] == 'A':
                     freq[0][i] = 1
-                elif seq[i] == 'C':
+                elif s[i] == 'C':
                     freq[1][i] = 1
-                elif seq[i] == 'G':
+                elif s[i] == 'G':
                     freq[2][i] = 1
-                elif seq[i] == 'T':
+                elif s[i] == 'T':
                     freq[3][i] = 1
             self.PROFILES[seq] = freq
 
