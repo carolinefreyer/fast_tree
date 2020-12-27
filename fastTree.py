@@ -115,6 +115,10 @@ class FastTree(object):
                     - self.get_avg_dist_from_children(j) - n * self.profile_distance(prof_i, T) \
                     + self.get_avg_dist_from_children(i)
         lambd = 0.5 + numerator / (2 * (n - 2) * self.compute_variance(i, j))
+        if lambd < 0:
+            lambd = 0
+        if lambd > 1:
+            lambd = 1
         print(lambd)
         return lambd
 
@@ -126,27 +130,27 @@ class FastTree(object):
                @i: node number
                @n: number of active nodes
         """
-
         T = self.TOTAL_PROFILE
         n = len(self.ACTIVE)
         deltaii = self.get_avg_dist_from_children(i)
-        ans = (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
+        return (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
                 - sum(list(self.UPDIST[x] for x in self.ACTIVE))) / (n - 2)
-        return ans
 
     def get_avg_dist_from_children(self, i):
         """
         :param i: the node to calculate avg distance of
         :return: the avg distance between node i and its children
         """
-        deltaii = self.profile_distance(self.PROFILES[i], self.PROFILES[i])
-        normaliser = 1
+        deltaii = 0
+        normaliser = 0
         children = self.CHILDREN[i]
         for c1 in range(len(children)):
             for c2 in range(c1, len(children)):
                 normaliser += 1
                 deltaii += self.profile_distance(self.PROFILES[children[c1]], self.PROFILES[children[c2]])
-        return deltaii / normaliser
+        if normaliser != 0:
+            deltaii = deltaii / normaliser
+        return deltaii
 
     def merge_profiles(self, seq1, seq2, weight=0.5):
         """
@@ -212,14 +216,9 @@ class FastTree(object):
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
-        # self.incr_total_profile(i,j,newNode)
-        # self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
-        #                       + np.array(self.PROFILES[newNode]) / (n - 1)
         self.UPDIST[newNode] = self.get_updist(i, j, weight)
-
         self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
                                       + weight * (1 - weight) * self.compute_variance(i, j)
-
         self.ACTIVE.append(newNode)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
