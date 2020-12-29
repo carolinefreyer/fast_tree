@@ -32,8 +32,9 @@ class FastTree(object):
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
-            self.SEQUENCES[tmp2] = tmp1
-        for seq in self.SEQUENCES:
+            self.SEQUENCES[tmp1] = tmp2
+        #for seq in self.SEQUENCES:
+        for seq in self.SEQUENCES.values():
             self.CHILDREN[seq] = []
             # Updist and variance correction zero for all leaves
             self.UPDIST[seq] = 0
@@ -50,6 +51,9 @@ class FastTree(object):
                 elif seq[i] == 'T':
                     freq[3][i] = 1
             self.PROFILES[seq] = freq
+
+    def get_sequence_key(self, value):
+        return list(self.SEQUENCES.keys())[list(self.SEQUENCES.values()).index(value)]
 
     def update_total_profile(self):
         """Calculates the average of all active nodes profiles
@@ -190,7 +194,7 @@ class FastTree(object):
         u_ij = weight * (self.UPDIST[i] + du_i_ij) + (1 - weight) * (self.UPDIST[j] + du_j_ij)
         return u_ij
 
-    def initialize_nodes_tophits(self, node, distances, m):
+    def initialize_nodes_tophits(self, key, distances, m):
         """
         Updates self.TOP_HITS with the m top-hits for the node given its closest neighbours in sorted_distances
         :param distances: dictionary with a key tuple (node, neighbor) and the distance as value
@@ -199,44 +203,60 @@ class FastTree(object):
         sorted_distances = sorted(distances.keys(), key=lambda item: distances[item])
         for i in range(m):
             neighbor = sorted_distances[i][1]
-            if node not in self.TOP_HITS:
-                self.TOP_HITS.update({node:[neighbor]})
+            if key not in self.TOP_HITS:
+                self.TOP_HITS.update({key:[neighbor]})
             else:
-                self.TOP_HITS[node].append(neighbor)
+                self.TOP_HITS[key].append(neighbor)
 
     def initialize_top_hits(self):
         """
-        Updates the self.TOP_HITS for node A with the minimum UPDIST and all nodes within node A's top-hits list
+        Initializes the m top_hits for node A with minimum out distance node A and all nodes within node A's top-hits list.
+        The updated top-hits are saved in self.TOP_HITS
         """
+        self.update_total_profile()  # Maybe move this to initialize_sequences()
         # 1: select sequence with minimal out distance (and gaps)
-        nodeA = sorted(self.UPDIST.keys(), key=lambda item: self.UPDIST[item])[0]
+        out_distances = {}
+        for key, sequence in self.SEQUENCES.items():
+            out_distances.update({key: self.out_distance(self.PROFILES[sequence], sequence)})
+        keyA = sorted(out_distances.keys(), key=lambda item: out_distances[item])[0]
+        nodeA = self.SEQUENCES[keyA]
         # 2: find top-hits list for node A
-        self.update_total_profile() # Maybe move this to initialize_sequences()
-        distances_A = {(nodeA, j): self.neighbor_join_criterion(nodeA, j) for j in self.ACTIVE if nodeA != j}
+        distances_A = {(keyA, self.get_sequence_key(j)): self.neighbor_join_criterion(nodeA, j) for j in self.ACTIVE if nodeA != j}
         m = int(math.sqrt(len(self.SEQUENCES))) #not sure about how to calcuate m
-        self.initialize_nodes_tophits(nodeA, distances_A, 2*m)
-        # 3: evaluate top-hits for m neighbours within node A's top-hits
-        for i in range(m):
-            nodeB = self.TOP_HITS[nodeA][i]
-            distances_B = {(nodeB, j): self.neighbor_join_criterion(nodeA, j) for j in self.TOP_HITS[nodeA] if nodeB != j}
-            self.initialize_nodes_tophits(nodeB, distances_B, m)
+        self.initialize_nodes_tophits(keyA, distances_A, 2*m)
+        # 3: check if restriction du(A,B) <= 0.75 * du(1,H_2m) holds
+        if distances_A[(keyA, self.TOP_HITS[keyA][0])] <= 0.75 * distances_A[(keyA, self.TOP_HITS[keyA][-1])]:
+            # 4: evaluate top-hits for m neighbours within node A's top-hits
+            for i in range(m):
+                keyB = self.TOP_HITS[keyA][i]
+                nodeB = self.SEQUENCES[keyB]
+                distances_B = {(keyB, j): self.neighbor_join_criterion(nodeB, self.SEQUENCES[j]) for j in self.TOP_HITS[keyA] if keyB != j}
+                self.initialize_nodes_tophits(keyB, distances_B, m)
 
-    def update_tophits(self, newNode):
+    def refresh_tophits(self, newNode):
         """
         This function compute the top-hits list for the newNode by comparing if to all entries in the top-hits lists of its children.
-        :param newNode: tuple with children nodes
+        :param newNode: Tuple with the two merged sequences
         :return:
         """
-        nodeA, nodeB = newNode
-        if nodeA in self.TOP_HITS.keys() and nodeB in self.TOP_HITS.keys(): # safety check, can be removed later
-            top_hitsA = self.TOP_HITS.get(nodeA).remove(nodeB)
-            top_hitsB = self.TOP_HITS.get(nodeB).remove(nodeA)
-            candidates = list(set(top_hitsA + top_hitsB)) # remove duplicates
-            distances = {(newNode, j): self.neighbor_join_criterion(nodeA, j) for j in candidates}
-            m = int(math.sqrt(len(self.SEQUENCES))) # m can decrease what to do about that?
-            self.initialize_nodes_tophits(self, newNode, distances, m)
-            # TODO: compare each of the new nodes top-hits to each other (NOTE: pay attention that they are not double added to the top hits)
-            # TODO: for all other nodes that either have nodeA or nodeB in their tophits replace with newNode
+        seqA, seqB = newNode
+        keyA, keyB = self.get_sequence_key(seqA), self.get_sequence_key(seqB)
+        self.SEQUENCES.update({(keyA, keyB):(seqA,seqB)})
+        top_hitsA, top_hitsB = self.TOP_HITS.get(keyA), self.TOP_HITS.get(keyB)
+        candidates = [i for i in set(top_hitsA + top_hitsB) if i != keyA and i != keyB] # remove duplicates
+        # find the top-hits for the new node
+        distances = {((keyA, keyB), j): self.neighbor_join_criterion(newNode, self.SEQUENCES[j]) for j in candidates}
+        m = int(math.sqrt(len(self.SEQUENCES)))
+        self.initialize_nodes_tophits((keyA, keyB), distances, m)
+        self.TOP_HITS.pop(keyA), self.TOP_HITS.pop(keyB)
+        # TODO: compare each of the new nodes top-hits to each other (NOTE: pay attention that they are not double added to the top hits)
+        for i in self.TOP_HITS[(keyA, keyB)]:
+            node = self.SEQUENCES[i]
+            distances = {(i, j): self.neighbor_join_criterion(node, self.SEQUENCES[j]) for j in
+                           self.TOP_HITS[(keyA, keyB)] if i != j}
+            m = m if len(self.TOP_HITS[(i)]) > m else len(self.TOP_HITS[(keyA, keyB)])  # allow top-hits list to decrease in size
+            self.initialize_nodes_tophits(i, distances, m)
+        # TODO: for all other nodes that either have nodeA or nodeB in their tophits replace with newNode
 
     def neighborJoin(self):
 
@@ -257,11 +277,14 @@ class FastTree(object):
             return
 
         # Find min join criterion
-        distances = {(i, j): self.neighbor_join_criterion(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
-        newNode = min(distances, key=distances.get)
-        # TODO: Place at appropriate position and incoorparate into joining function
-        self.update_tophits(newNode)
-        i, j = newNode
+        distances = {}
+        for i, tophits in self.TOP_HITS.items():
+            for j in tophits:
+                if (i,j) not in distances.keys() and (j, i) not in distances.keys():
+                    distances.update({(i, j): self.neighbor_join_criterion(self.SEQUENCES[i], self.SEQUENCES[j])})
+        newKeys = min(distances, key=distances.get)
+        i, j = self.SEQUENCES[newKeys[0]], self.SEQUENCES[newKeys[1]]
+        newNode = (i,j)
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
@@ -277,4 +300,6 @@ class FastTree(object):
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
                               + np.array(self.PROFILES[newNode])) / (n - 1)
+        # TODO: Place at appropriate position and incoorparate into joining function
+        self.refresh_tophits(newNode)
         return
