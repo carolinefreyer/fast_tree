@@ -140,7 +140,6 @@ class FastTree(object):
                @i: node number
                @n: number of active nodes
         """
-
         T = self.TOTAL_PROFILE
         n = len(self.ACTIVE)
         deltaii = self.get_avg_dist_from_children(i)
@@ -152,14 +151,15 @@ class FastTree(object):
         :param i: the node to calculate avg distance of
         :return: the avg distance between node i and its children
         """
-        deltaii = self.profile_distance(self.PROFILES[i], self.PROFILES[i])
-        normaliser = 1
+        deltaii = 0
+        normaliser = 0
         children = self.CHILDREN[i]
-        for c1 in range(len(children)):
-            for c2 in range(c1, len(children)):
-                normaliser += 1
-                deltaii += self.profile_distance(self.PROFILES[children[c1]], self.PROFILES[children[c2]])
-        return deltaii / normaliser
+        for c1 in children:
+            normaliser += 1
+            deltaii += self.profile_distance(self.PROFILES[i], self.PROFILES[c1])
+        if normaliser != 0:
+            deltaii = deltaii / normaliser
+        return deltaii
 
     def merge_profiles(self, seq1, seq2, weight=0.5):
         """
@@ -208,7 +208,7 @@ class FastTree(object):
             self.update_total_profile()
         self.ITERATION += 1
         # Base case
-        if n == 2:
+        if n < 3:
             # Pia: I don't think it makes sense to calculate the weights, up and out distances for the last join.
             # The formulas don't work with n=2 (division by 0) but we also don't need that info anymore after joining
             # everything. I think.
