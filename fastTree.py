@@ -271,52 +271,19 @@ class FastTree(object):
 
     def nearestNeighbourInterchange(self):
         end = int(np.log2(len(self.SEQUENCES)) + 1)
+        edgesInternal = []
+        for i in self.CHILDREN:
+            #remove edges coming from root
+            if i == self.ACTIVE[0]:
+                continue
+            for j in self.CHILDREN[i]:
+                if j not in self.SEQUENCES:
+                    edgesInternal.append([i, j])
+        #To have correct profile values for comparing
         self.makeUnRooted()
+        print(edgesInternal)
         for _ in range(end):
-            edgesInternal = []
-            for i in self.CHILDREN:
-                for j in self.CHILDREN[i]:
-                    if j not in self.SEQUENCES:
-                        edgesInternal.append([i,j])
-
             for i in edgesInternal:
-                # if self.ACTIVE[0] in i:
-                #     if self.ACTIVE[0] == i[0]:
-                #         A = i[1][0]
-                #         B = i[1][1]
-                #         if i[1] == self.CHILDREN[i[0]][0]:
-                #             C = self.CHILDREN[i[0]][1]
-                #         else:
-                #             C = self.CHILDREN[i[0]][0]
-                #     elif self.ACTIVE[0] == i[1]:
-                #         A = i[0][0]
-                #         B = i[0][1]
-                #         if i[0] == self.CHILDREN[i[1]][0]:
-                #             C = self.CHILDREN[i[1]][1]
-                #         else:
-                #             C = self.CHILDREN[i[1]][0]
-                #
-                #     dAB = self.corrected_distances(A, B)
-                #     dAC = self.corrected_distances(A, C)
-                #     dBC = self.corrected_distances(B, C)
-                #
-                #     if dAB < min(dAC, dBC):
-                #         print("no switch")
-                #
-                #     if dAC < min(dAB, dBC):
-                #         self.CHILDREN[i[0]].remove(B)
-                #         self.CHILDREN[i[1]].remove(C)
-                #         self.CHILDREN[i[0]].append(C)
-                #         self.CHILDREN[i[1]].append(B)
-                #         print("switch B, C")
-                #
-                #     elif dBC < min(dAB, dAC):
-                #         self.CHILDREN[i[0]].remove(A)
-                #         self.CHILDREN[i[1]].remove(C)
-                #         self.CHILDREN[i[0]].append(C)
-                #         self.CHILDREN[i[1]].append(A)
-                #         print("switch A, C")
-                # else:
                 A = i[0][0]
                 B = i[0][1]
                 C = i[1][0]
@@ -346,7 +313,7 @@ class FastTree(object):
                 if dABCD < min(dACBD,dADBC):
                     print("no switch")
 
-                if dACBD < min(dABCD,dADBC):
+                elif dACBD < min(dABCD,dADBC):
                     self.CHILDREN[i[0]].remove(B)
                     self.CHILDREN[i[1]].remove(C)
                     self.CHILDREN[i[0]].append(C)
