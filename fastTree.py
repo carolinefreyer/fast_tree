@@ -36,17 +36,19 @@ class FastTree(object):
             self.UPDIST[seq] = 0
             self.VARIANCE_CORR[seq] = 0
             self.ACTIVE.append(seq)
-            freq = np.zeros((4, len(self.SEQUENCES[seq])))
-            for i in range(len(self.SEQUENCES[seq])):
-                if self.SEQUENCES[seq][i] == 'A':
+            s = self.SEQUENCES[seq]
+            freq = np.zeros((4, len(s)))
+            for i in range(len(s)):
+                if s[i] == 'A':
                     freq[0][i] = 1
-                elif self.SEQUENCES[seq][i] == 'C':
+                elif s[i] == 'C':
                     freq[1][i] = 1
-                elif self.SEQUENCES[seq][i] == 'G':
+                elif s[i] == 'G':
                     freq[2][i] = 1
-                elif self.SEQUENCES[seq][i] == 'T':
+                elif s[i] == 'T':
                     freq[3][i] = 1
             self.PROFILES[seq] = freq
+
     def update_total_profile(self):
         """Calculates the average of all active nodes profiles
         :return: 4xL matrix with the average frequency count of each nucleotide over all profiles"""
@@ -72,7 +74,6 @@ class FastTree(object):
         """
         d = 0
         # Length of sequence
-
         L = len(profile1[0])
         for i in range(L):
             for j in range(4):
@@ -124,6 +125,11 @@ class FastTree(object):
                     - self.get_avg_dist_from_children(j) - n * self.profile_distance(prof_i, T) \
                     + self.get_avg_dist_from_children(i)
         lambd = 0.5 + numerator / (2 * (n - 2) * self.compute_variance(i, j))
+        if lambd < 0:
+            lambd = 0
+        if lambd > 1:
+            lambd = 1
+        print(lambd)
         return lambd
 
     def out_distance(self, profile, i):
@@ -138,9 +144,8 @@ class FastTree(object):
         T = self.TOTAL_PROFILE
         n = len(self.ACTIVE)
         deltaii = self.get_avg_dist_from_children(i)
-        ans = (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
+        return (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
                 - sum(list(self.UPDIST[x] for x in self.ACTIVE))) / (n - 2)
-        return ans
 
     def get_avg_dist_from_children(self, i):
         """
@@ -208,7 +213,7 @@ class FastTree(object):
             # The formulas don't work with n=2 (division by 0) but we also don't need that info anymore after joining
             # everything. I think.
             n1, n2 = self.ACTIVE[0], self.ACTIVE[1]
-            self.CHILDREN[(n1,n2)] = [n1,n2]
+            self.CHILDREN[(n1, n2)] = [n1, n2]
             self.ACTIVE.remove(n1), self.ACTIVE.remove(n2)
             self.ACTIVE.append((n1, n2))
             return
@@ -220,14 +225,9 @@ class FastTree(object):
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
-        # self.incr_total_profile(i,j,newNode)
-        # self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
-        #                       + np.array(self.PROFILES[newNode]) / (n - 1)
         self.UPDIST[newNode] = self.get_updist(i, j, weight)
-
         self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
                                       + weight * (1 - weight) * self.compute_variance(i, j)
-
         self.ACTIVE.append(newNode)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
