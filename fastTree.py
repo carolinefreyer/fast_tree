@@ -145,10 +145,9 @@ class FastTree(object):
         deltaii = 0
         normaliser = 0
         children = self.CHILDREN[i]
-        for c1 in range(len(children)):
-            for c2 in range(c1, len(children)):
-                normaliser += 1
-                deltaii += self.profile_distance(self.PROFILES[children[c1]], self.PROFILES[children[c2]])
+        for c1 in children:
+            normaliser += 1
+            deltaii += self.profile_distance(self.PROFILES[i], self.PROFILES[c1])
         if normaliser != 0:
             deltaii = deltaii / normaliser
         return deltaii
@@ -200,7 +199,7 @@ class FastTree(object):
             self.update_total_profile()
         self.ITERATION += 1
         # Base case
-        if n == 2:
+        if n < 3:
             # Pia: I don't think it makes sense to calculate the weights, up and out distances for the last join.
             # The formulas don't work with n=2 (division by 0) but we also don't need that info anymore after joining
             # everything. I think.
