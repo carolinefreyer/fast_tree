@@ -129,7 +129,6 @@ class FastTree(object):
             lambd = 0
         if lambd > 1:
             lambd = 1
-        print(lambd)
         return lambd
 
     def out_distance(self, profile, i):
@@ -201,12 +200,12 @@ class FastTree(object):
         return u_ij
 
     def neighborJoin(self):
-
         n = len(self.ACTIVE)
         # update the total profile every 200 iterations and at the beginning
         if self.ITERATION % 200 == 0:
             self.update_total_profile()
         self.ITERATION += 1
+        print(self.ITERATION)
         # Base case
         if n < 3:
             # Pia: I don't think it makes sense to calculate the weights, up and out distances for the last join.
@@ -234,21 +233,6 @@ class FastTree(object):
                               + np.array(self.PROFILES[newNode])) / (n - 1)
         return
 
-    def getEdges(self, list, edges):
-        i = list[0]
-        j = list[1]
-        edges.append([i, j])
-        if type(i) is str and type(j) is str:
-            return edges
-        if type(i) is str:
-            edges.append(self.getEdges(j, edges))
-        elif type(j) is str:
-            edges.append(self.getEdges(i,edges))
-        else:
-            edges.append(self.getEdges(i, edges))
-            edges.append(self.getEdges(j, edges))
-        return edges
-
     def makeUnRooted(self):
         n1 = self.ACTIVE[0][0]
         n2 = self.ACTIVE[0][1]
@@ -258,7 +242,7 @@ class FastTree(object):
         newProfile = self.merge_profiles(n1, n2, weight=0.5)
         self.PROFILES[n1] = newProfile
         self.PROFILES[n2] = newProfile
-        return
+        return [n1,n2]
 
     def recomputeProfiles(self):
         for n in self.PROFILES:
@@ -280,52 +264,112 @@ class FastTree(object):
                 if j not in self.SEQUENCES:
                     edgesInternal.append([i, j])
         #To have correct profile values for comparing
-        self.makeUnRooted()
-        print(edgesInternal)
+        [n1, n2] = self.makeUnRooted()
         for _ in range(end):
             for i in edgesInternal:
-                A = i[0][0]
-                B = i[0][1]
-                C = i[1][0]
-                D = i[1][1]
-                #root of tree
-                if i[1] in self.CHILDREN[i[0]] and i[0] not in self.CHILDREN[i[1]]:
-                    if i[1] == i[0][0]:
-                        A = i[0][1]
+
+                A = self.CHILDREN[i[0]][0]
+                B = self.CHILDREN[i[0]][1]
+                C = self.CHILDREN[i[1]][0]
+                D = self.CHILDREN[i[1]][1]
+                if i[1] in self.CHILDREN[i[0]]:
+                    if len(self.CHILDREN[i[0]]) == 3:
+                        if n1 in self.CHILDREN[i[0]]:
+                            [A] = [j for j in self.CHILDREN[i[0]] if j !=i[1] and j!=n1]
+                            B = n1
+                        else:
+                            [A] = [j for j in self.CHILDREN[i[0]] if j != i[1] and j != n2]
+                            B = n2
                     else:
-                        A = i[0][0]
-                    for j in self.CHILDREN:
-                        if i[0] in self.CHILDREN[j]:
-                            B = j
-                if i[0] in self.CHILDREN[i[1]] and i[1] not in self.CHILDREN[i[0]]:
-                    if i[0] == i[1][0]:
-                        C = i[1][1]
+                        if i[1] == A:
+                            A = self.CHILDREN[i[0]][1]
+                        for p1 in self.CHILDREN:
+                            if i[0] in self.CHILDREN[p1]:
+                                B = p1
+                if i[0] in self.CHILDREN[i[1]]:
+                    if len(self.CHILDREN[i[1]]) == 3:
+                        if n1 in self.CHILDREN[i[1]]:
+                            [C] = [j for j in self.CHILDREN[i[1]] if j !=i[0] and j!=n1]
+                            D = n1
+                        else:
+                            [C] = [j for j in self.CHILDREN[i[1]] if j != i[0] and j != n2]
+                            D = n2
                     else:
-                        C = i[1][0]
-                    for j in self.CHILDREN:
-                        if i[1] in self.CHILDREN[j]:
-                            D = j
+                        if i[0] == C:
+                            C = self.CHILDREN[i[1]][1]
+                        for p2 in self.CHILDREN:
+                            if i[1] in self.CHILDREN[p2]:
+                                D = p2
+
 
                 dABCD = self.corrected_distances(A,B) + self.corrected_distances(C,D)
                 dACBD = self.corrected_distances(A,C) + self.corrected_distances(B,D)
                 dADBC = self.corrected_distances(A,D) + self.corrected_distances(B,C)
 
-                if dABCD < min(dACBD,dADBC):
-                    print("no switch")
+                # if dABCD < min(dACBD,dADBC):
+                #     print("no switch")
 
-                elif dACBD < min(dABCD,dADBC):
-                    self.CHILDREN[i[0]].remove(B)
-                    self.CHILDREN[i[1]].remove(C)
-                    self.CHILDREN[i[0]].append(C)
-                    self.CHILDREN[i[1]].append(B)
+                if dACBD < min(dABCD,dADBC):
                     print("switch B, C")
+                    if B not in self.CHILDREN[i[0]]:
+                        self.CHILDREN[i[0]] = [A, C]
+                        self.CHILDREN[i[1]] = [D, i[0]]
+                        self.CHILDREN[B].remove(i[0])
+                        self.CHILDREN[B].append(i[1])
+                        edgesInternal.remove([B, i[0]])
+                        edgesInternal.append([B, i[1]])
+                    else:
+                        self.CHILDREN[i[0]].remove(B)
+                        self.CHILDREN[i[1]].remove(C)
+                        self.CHILDREN[i[0]].append(C)
+                        self.CHILDREN[i[1]].append(B)
+
 
                 elif dADBC < min(dABCD, dACBD):
-                    self.CHILDREN[i[0]].remove(B)
-                    self.CHILDREN[i[1]].remove(D)
-                    self.CHILDREN[i[0]].append(D)
-                    self.CHILDREN[i[1]].append(B)
                     print("switch B, D")
+                    if B not in self.CHILDREN[i[0]]:
+                        self.CHILDREN[i[0]] = [A, D]
+                        self.CHILDREN[i[1]] = [C, i[0]]
+                        self.CHILDREN[B].remove(i[0])
+                        self.CHILDREN[B].append(i[1])
+                        edgesInternal.remove([B,i[0]])
+                        edgesInternal.append([B,i[1]])
+                    elif D not in self.CHILDREN[i[1]]:
+                        self.CHILDREN[i[0]] = [A, i[1]]
+                        self.CHILDREN[i[1]] = [C, B]
+                        self.CHILDREN[D].remove(i[1])
+                        self.CHILDREN[D].append(i[0])
+                        edgesInternal.remove([D, i[1]])
+                        edgesInternal.append([D, i[0]])
+                    else:
+                        self.CHILDREN[i[0]].remove(B)
+                        self.CHILDREN[i[1]].remove(D)
+                        self.CHILDREN[i[0]].append(D)
+                        self.CHILDREN[i[1]].append(B)
 
                 self.recomputeProfiles()
+        self.CHILDREN[(n1, n2)] = [n1, n2]
+        self.CHILDREN[n2].remove(n1)
+        self.CHILDREN[n1].remove(n2)
         return
+
+
+    def newickFormat(self,i,str):
+        if len(self.CHILDREN[i]) == 0:
+            return i
+        else:
+            temp1 = self.newickFormat(self.CHILDREN[i][0],str)
+            temp2 = self.newickFormat(self.CHILDREN[i][1],str)
+            str = "("+temp1 + ","+temp2+")"
+            return str
+
+    # def branchLength(self):
+    #     blen = {}
+    #     for i in self.CHILDREN:
+    #         for j in self.CHILDREN[i]:
+    #             if j in self.SEQUENCES:
+    #                 blen[j] = self.corrected_distances(j,j)/2
+    #             else:
+    #                 blen[j] =
+
+
