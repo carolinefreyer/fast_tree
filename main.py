@@ -7,6 +7,5 @@ def run():
     tree.initialize_top_hits()
     while(len(tree.ACTIVE)>1):
         tree.neighborJoin()
-    
     #print(tree.ACTIVE)
 run()
