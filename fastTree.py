@@ -16,6 +16,7 @@ class FastTree(object):
         self.TOTAL_PROFILE = []
         self.ITERATION = 0
         self.VARIANCE_CORR = {}
+        self.BRANCH_LENGTHS = {}
 
     def initialize_sequences(self, filename):
         """
@@ -34,7 +35,7 @@ class FastTree(object):
             self.UPDIST[seq] = 0
             self.VARIANCE_CORR[seq] = 0
             self.ACTIVE.append(seq)
-            #Compute profiles for each of the sequences
+            # Compute profiles for each of the sequences
             s = self.SEQUENCES[seq]
             freq = np.zeros((4, len(s)))
             for i in range(len(s)):
@@ -104,7 +105,7 @@ class FastTree(object):
         :param j: node 2
         :returns: corrected distance between nodes i and j
         """
-        return min(-3/4 *np.log(1-4/3*self.uncorrected_distance(i,j)),3)
+        return min(-3 / 4 * np.log(1 - 4 / 3 * self.uncorrected_distance(i, j)), 3)
 
     def compute_variance(self, i, j):
         """
@@ -113,7 +114,7 @@ class FastTree(object):
         :param j: node 2
         :returns: variance between nodes i and j
         """
-        profile_i, profile_j= self.PROFILES[i], self.PROFILES[j]
+        profile_i, profile_j = self.PROFILES[i], self.PROFILES[j]
         return self.profile_distance(profile_i, profile_j) - self.VARIANCE_CORR[i] - self.VARIANCE_CORR[j]
 
     def compute_weight(self, i, j, n):
@@ -227,6 +228,8 @@ class FastTree(object):
             self.CHILDREN[(i, j)] = [i, j]
             # (i,j) becomes the root of the tree.
             self.ACTIVE.remove(i), self.ACTIVE.remove(j)
+            self.PROFILES[(i, j)] = self.merge_profiles(i, j)
+            self.UPDIST[(i, j)] = self.get_updist(i, j, 0.5)
             self.ACTIVE.append((i, j))
             return
 
@@ -241,10 +244,10 @@ class FastTree(object):
         self.PROFILES[new_node] = self.merge_profiles(i, j, weight=weight)
         self.UPDIST[new_node] = self.get_updist(i, j, weight)
         self.VARIANCE_CORR[new_node] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
-                                      + weight * (1 - weight) * self.compute_variance(i, j)
+                                       + weight * (1 - weight) * self.compute_variance(i, j)
         self.ACTIVE.append(new_node)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
-        self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
+        self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE) * n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
                               + np.array(self.PROFILES[new_node])) / (n - 1)
         return
 
@@ -254,16 +257,16 @@ class FastTree(object):
         """
         root_child1 = self.ACTIVE[0][0]
         root_child2 = self.ACTIVE[0][1]
-        #Join root_child1 and root_child2
+        # Join root_child1 and root_child2
         self.CHILDREN[root_child2].append(root_child1)
         self.CHILDREN[root_child1].append(root_child2)
-        #Remove root
-        del self.CHILDREN[(root_child1,root_child2)]
-        #Compute profile of new join
+        # Remove root
+        del self.CHILDREN[(root_child1, root_child2)]
+        # Compute profile of new join
         newProfile = self.merge_profiles(root_child1, root_child2, weight=0.5)
         self.PROFILES[root_child1] = newProfile
         self.PROFILES[root_child2] = newProfile
-        return [root_child1,root_child2]
+        return [root_child1, root_child2]
 
     def recomputeProfiles(self):
         """
@@ -271,11 +274,12 @@ class FastTree(object):
         """
         for n in self.PROFILES:
             if n not in self.SEQUENCES:
-                profiles = [self.PROFILES[x] for x in self.CHILDREN[n]]
-                profile = profiles[0]
-                for p in profiles[1:]:
-                    profile = [[sum(x) for x in zip(profile[i], p[i])] for i in range(4)]
-                self.PROFILES[n] = [[t / len(self.CHILDREN[n]) for t in row] for row in profile]
+                if n != self.ACTIVE[0]:
+                    profiles = [self.PROFILES[x] for x in self.CHILDREN[n]]
+                    profile = profiles[0]
+                    for p in profiles[1:]:
+                        profile = [[sum(x) for x in zip(profile[i], p[i])] for i in range(4)]
+                    self.PROFILES[n] = [[t / len(self.CHILDREN[n]) for t in row] for row in profile]
 
     def nearestNeighbourInterchange(self):
         """
@@ -284,16 +288,16 @@ class FastTree(object):
         end = int(np.log2(len(self.SEQUENCES)) + 1)
         edges_internal = []
         for i in self.CHILDREN:
-            #skips edges coming from root
+            # skips edges coming from root
             if i == self.ACTIVE[0]:
                 continue
             for j in self.CHILDREN[i]:
-                #skips edges connected to a leaf.
+                # skips edges connected to a leaf.
                 if j not in self.SEQUENCES:
                     edges_internal.append([i, j])
-        #Make tree unrooted, needed to adjust profiles.
+        # Make tree unrooted, needed to adjust profiles.
         [n1, n2] = self.makeUnRooted()
-        #Run nearest neighbour interchange log(N) + 1 times.
+        # Run nearest neighbour interchange log(N) + 1 times.
         for _ in range(end):
             for i in edges_internal:
 
@@ -304,10 +308,10 @@ class FastTree(object):
 
                 # if i[1] child of i[0]
                 if i[1] in self.CHILDREN[i[0]]:
-                    #if one of the nodes is a child of the root.
+                    # if one of the nodes is a child of the root.
                     if len(self.CHILDREN[i[0]]) == 3:
                         if n1 in self.CHILDREN[i[0]]:
-                            [A] = [j for j in self.CHILDREN[i[0]] if j !=i[1] and j!=n1]
+                            [A] = [j for j in self.CHILDREN[i[0]] if j != i[1] and j != n1]
                             B = n1
                         else:
                             [A] = [j for j in self.CHILDREN[i[0]] if j != i[1] and j != n2]
@@ -323,7 +327,7 @@ class FastTree(object):
                     # if one of the nodes is a child of the root.
                     if len(self.CHILDREN[i[1]]) == 3:
                         if n1 in self.CHILDREN[i[1]]:
-                            [C] = [j for j in self.CHILDREN[i[1]] if j !=i[0] and j!=n1]
+                            [C] = [j for j in self.CHILDREN[i[1]] if j != i[0] and j != n1]
                             D = n1
                         else:
                             [C] = [j for j in self.CHILDREN[i[1]] if j != i[0] and j != n2]
@@ -335,16 +339,15 @@ class FastTree(object):
                             if i[1] in self.CHILDREN[p2]:
                                 D = p2
 
-
-                dABCD = self.corrected_distances(A,B) + self.corrected_distances(C,D)
-                dACBD = self.corrected_distances(A,C) + self.corrected_distances(B,D)
-                dADBC = self.corrected_distances(A,D) + self.corrected_distances(B,C)
+                dABCD = self.corrected_distances(A, B) + self.corrected_distances(C, D)
+                dACBD = self.corrected_distances(A, C) + self.corrected_distances(B, D)
+                dADBC = self.corrected_distances(A, D) + self.corrected_distances(B, C)
 
                 # if dABCD < min(dACBD,dADBC):
                 #     print("no switch")
 
-                if dACBD < min(dABCD,dADBC):
-                    #Switch B and C
+                if dACBD < min(dABCD, dADBC):
+                    # Switch B and C
                     if B not in self.CHILDREN[i[0]]:
                         self.CHILDREN[i[0]] = [A, C]
                         self.CHILDREN[i[1]] = [D, i[0]]
@@ -360,14 +363,14 @@ class FastTree(object):
 
 
                 elif dADBC < min(dABCD, dACBD):
-                    #Switch B and D
+                    # Switch B and D
                     if B not in self.CHILDREN[i[0]]:
                         self.CHILDREN[i[0]] = [A, D]
                         self.CHILDREN[i[1]] = [C, i[0]]
                         self.CHILDREN[B].remove(i[0])
                         self.CHILDREN[B].append(i[1])
-                        edges_internal.remove([B,i[0]])
-                        edges_internal.append([B,i[1]])
+                        edges_internal.remove([B, i[0]])
+                        edges_internal.append([B, i[1]])
                     elif D not in self.CHILDREN[i[1]]:
                         self.CHILDREN[i[0]] = [A, i[1]]
                         self.CHILDREN[i[1]] = [C, B]
@@ -382,14 +385,13 @@ class FastTree(object):
                         self.CHILDREN[i[1]].append(B)
 
                 self.recomputeProfiles()
-        #Make tree rooted again before returning.
+        # Make tree rooted again before returning.
         self.CHILDREN[(n1, n2)] = [n1, n2]
         self.CHILDREN[n2].remove(n1)
         self.CHILDREN[n1].remove(n2)
         return
 
-
-    def newickFormat(self,i,str):
+    def newickFormat(self, i, res):
         """
         Recursively constructs tree in newick format.
         :param i: current node
@@ -397,20 +399,55 @@ class FastTree(object):
         :returns: newick format of tree rooted at i.
         """
         if len(self.CHILDREN[i]) == 0:
-            return i
+            return i + ':' + str(self.BRANCH_LENGTHS[i])
         else:
-            temp1 = self.newickFormat(self.CHILDREN[i][0],str)
-            temp2 = self.newickFormat(self.CHILDREN[i][1],str)
-            str = "("+temp1 + ","+temp2+")"
-            return str
+            temp1 = self.newickFormat(self.CHILDREN[i][0], res)
+            temp2 = self.newickFormat(self.CHILDREN[i][1], res)
+            if i != self.ACTIVE[0]:
+                res = "(" + temp1 + "," + temp2 + "):" + str(self.BRANCH_LENGTHS[i])
+            else:
+                res = "(" + temp1 + "," + temp2 + ")"
+            return res
 
     # def branchLength(self):
     #     blen = {}
-    #     for i in self.CHILDREN:
-    #         for j in self.CHILDREN[i]:
-    #             if j in self.SEQUENCES:
-    #                 blen[j] = self.corrected_distances(j,j)/2
-    #             else:
-    #                 blen[j] =
+    #     children = self.CHILDREN
+    #     root = self.ACTIVE[0]
+    #     for leaf in self.SEQUENCES:
+    #
+    #     for i in children:
+    #         if children[i] == 0
+    #     # for j in self.CHILDREN[i]:
+    #     #     if j in self.SEQUENCES:
+    #     #         blen[j] = self.corrected_distances(j,j)/2
+    #     #     else:
+    #     #         blen[j] =
 
-
+    def recLength(self, nodes):
+        children = self.CHILDREN
+        lens = self.BRANCH_LENGTHS
+        root = self.ACTIVE[0]
+        i, j = nodes
+        dist_ij = self.corrected_distances(i, j)
+        dist_i = self.corrected_distances(i, root)
+        dist_j = self.corrected_distances(j, root)
+        for x in nodes:
+            if x == i:
+                other = j
+            else:
+                other = i
+            if len(children[x]) > 0:
+                c0 = children[x][0]
+                c1 = children[x][1]
+                if c0 or c1 not in lens:
+                    self.recLength(children[x])
+                lens[x] = (self.corrected_distances(c0, other) + self.corrected_distances(c1,
+                                                                                          other)
+                           + lens[c0] + lens[c1]) / 4 - (self.corrected_distances(c0, c1) + dist_ij) / 2
+        if len(children[i]) == 0 and len(children[j]) == 0:
+            lens[i] = (dist_i + dist_ij - dist_j) / 2
+            lens[j] = (dist_j + dist_ij - dist_i) / 2
+        elif len(children[i]) == 0:
+            lens[i] = (dist_i + dist_ij - lens[j]) / 2
+        elif len(children[j]) == 0:
+            lens[j] = (dist_j + dist_ij - lens[i]) / 2
