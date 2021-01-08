@@ -256,7 +256,7 @@ class FastTree(object):
         self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
         # TODO: compare each of the new nodes top-hits to each other
         for i in self.TOP_HITS[newNode]:
-            distances = {(i, j): self.neighbor_join_criterion(node, j) for j in
+            distances = {(i, j): self.neighbor_join_criterion(i, j) for j in
                          self.TOP_HITS[newNode] if i != j}
             self.initialize_nodes_tophits(i, distances, m)
         # TODO: for all other nodes that either have nodeA or nodeB in their tophits replace with newNode
@@ -265,7 +265,7 @@ class FastTree(object):
             seqB: newNode
         }
         for key, values in self.TOP_HITS.items():
-            self.TOP_HITS[key] = [replacements[x] for x in values if x in replacements]
+            self.TOP_HITS[key] = list(set([replacements[x] if x in replacements.keys() else x for x in values]))
 
     def refresh_tophits(self, newNode):
         """
