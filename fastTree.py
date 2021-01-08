@@ -288,6 +288,13 @@ class FastTree(object):
             self.initialize_nodes_tophits(keyNeighbor, distances_B, m)
         self.TOP_HITS[newNode] = self.TOP_HITS[newNode][:m]  # only save the m top hits from the new node
 
+    def update_best_joins(self, i, j):
+        copy = dict(self.BEST_JOINS)
+        for x in copy:
+            if self.BEST_JOINS[x] == i or self.BEST_JOINS[x] == j or x == i or x == j:
+                del self.BEST_JOINS[x]
+
+
     def neighborJoin(self):
 
         n = len(self.ACTIVE)
@@ -313,8 +320,13 @@ class FastTree(object):
         for num_A, num_B in self.BEST_JOINS.items():
             join_value = self.neighbor_join_criterion(num_A, num_B)
             if join_value < best:
+                best = join_value
                 best_join = (num_A, num_B)
         i, j = best_join[0], best_join[1]
+        # if i in self.BEST_JOINS:
+        #     del self.BEST_JOINS[i]
+        # if j in self.BEST_JOINS:
+        #     del self.BEST_JOINS[j]
         newNode = self.NODENUM
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
@@ -328,9 +340,10 @@ class FastTree(object):
                               + np.array(self.PROFILES[newNode])) / (n - 1)
         # TODO: Place at appropriate position and incoorparate into joining function
         m = int(math.sqrt(len(self.ACTIVE)))
-        if len(self.TOP_HITS.keys()) < 0.8 * m: # how to remove already joined nodes if refreshing is not necessary ???
-            self.refresh_tophits(newNode)
-        else:
-            self.update_tophits(newNode)
+        self.update_best_joins(i,j)
+       #if len(self.TOP_HITS.keys()) < 0.8 * m: # how to remove already joined nodes if refreshing is not necessary ???
+        self.refresh_tophits(newNode)
+        # else:
+        #     self.update_tophits(newNode)
         self.NODENUM += 1
         return
