@@ -7,6 +7,7 @@ ACGT_DIS = [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
 class FastTree(object):
     def __init__(self):
         # Dictionary holding sequences indexed by name
+        self.SEQ_NAMES = {}
         self.SEQUENCES = {}
         self.PROFILES = {}
         self.CHILDREN = {}
@@ -29,25 +30,26 @@ class FastTree(object):
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
-            self.SEQUENCES[tmp1] = tmp2
-        for seq in self.SEQUENCES:
-            self.CHILDREN[seq] = []
+            self.SEQ_NAMES[i] = tmp1
+            self.SEQUENCES[i] = tmp2
+            self.CHILDREN[i] = []
             # Updist and variance correction zero for all leaves
-            self.UPDIST[seq] = 0
-            self.VARIANCE_CORR[seq] = 0
-            self.ACTIVE.append(seq)
-            s = self.SEQUENCES[seq]
+            self.UPDIST[i] = 0
+            self.VARIANCE_CORR[i] = 0
+            self.ACTIVE.append(i)
+            s = self.SEQUENCES[i]
             freq = np.zeros((4, len(s)))
-            for i in range(len(s)):
-                if s[i] == 'A':
-                    freq[0][i] = 1
-                elif s[i] == 'C':
-                    freq[1][i] = 1
-                elif s[i] == 'G':
-                    freq[2][i] = 1
-                elif s[i] == 'T':
-                    freq[3][i] = 1
-            self.PROFILES[seq] = freq
+            for j in range(len(s)):
+                if s[j] == 'A':
+                    freq[0][j] = 1
+                elif s[j] == 'C':
+                    freq[1][j] = 1
+                elif s[j] == 'G':
+                    freq[2][j] = 1
+                elif s[j] == 'T':
+                    freq[3][j] = 1
+            self.PROFILES[i] = freq
+            self.NODENUM += 1
 
     def update_total_profile(self):
         """Calculates the average of all active nodes profiles
@@ -204,15 +206,16 @@ class FastTree(object):
             # The formulas don't work with n=2 (division by 0) but we also don't need that info anymore after joining
             # everything. I think.
             n1, n2 = self.ACTIVE[0], self.ACTIVE[1]
-            self.CHILDREN[(n1, n2)] = [n1, n2]
+            self.CHILDREN[self.NODENUM] = [n1, n2]
             self.ACTIVE.remove(n1), self.ACTIVE.remove(n2)
-            self.ACTIVE.append((n1, n2))
+            self.ACTIVE.append(self.NODENUM)
+            self.NODENUM += 1
             return
 
         # Find min join criterion
         distances = {(i, j): self.neighbor_join_criterion(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
-        newNode = min(distances, key=distances.get)
-        i, j = newNode
+        i,j = min(distances, key=distances.get)
+        newNode = self.NODENUM
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
@@ -223,4 +226,5 @@ class FastTree(object):
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
                               + np.array(self.PROFILES[newNode])) / (n - 1)
+        self.NODENUM += 1
         return
