@@ -8,6 +8,7 @@ ACGT_DIS = [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
 class FastTree(object):
     def __init__(self):
         # Dictionary holding sequences indexed by name
+        self.SEQ_NAMES = {}
         self.SEQUENCES = {}
         self.PROFILES = {}
         self.CHILDREN = {}
@@ -33,25 +34,26 @@ class FastTree(object):
         for i in range(int(len(lines) / 2)):
             tmp1 = lines[2 * i].strip()[1:]
             tmp2 = lines[2 * i + 1].strip()
-            self.SEQUENCES[tmp1] = tmp2
-        #for seq in self.SEQUENCES:
-        for seq in self.SEQUENCES.values():
-            self.CHILDREN[seq] = []
+            self.SEQ_NAMES[i] = tmp1
+            self.SEQUENCES[i] = tmp2
+            self.CHILDREN[i] = []
             # Updist and variance correction zero for all leaves
-            self.UPDIST[seq] = 0
-            self.VARIANCE_CORR[seq] = 0
-            self.ACTIVE.append(seq)
-            freq = np.zeros((4, len(seq)))
-            for i in range(len(seq)):
-                if seq[i] == 'A':
-                    freq[0][i] = 1
-                elif seq[i] == 'C':
-                    freq[1][i] = 1
-                elif seq[i] == 'G':
-                    freq[2][i] = 1
-                elif seq[i] == 'T':
-                    freq[3][i] = 1
-            self.PROFILES[seq] = freq
+            self.UPDIST[i] = 0
+            self.VARIANCE_CORR[i] = 0
+            self.ACTIVE.append(i)
+            s = self.SEQUENCES[i]
+            freq = np.zeros((4, len(s)))
+            for j in range(len(s)):
+                if s[j] == 'A':
+                    freq[0][j] = 1
+                elif s[j] == 'C':
+                    freq[1][j] = 1
+                elif s[j] == 'G':
+                    freq[2][j] = 1
+                elif s[j] == 'T':
+                    freq[3][j] = 1
+            self.PROFILES[i] = freq
+            self.NODENUM += 1
 
     def get_sequence_key(self, value):
         return list(self.SEQUENCES.keys())[list(self.SEQUENCES.values()).index(value)]
@@ -123,6 +125,10 @@ class FastTree(object):
                     - self.get_avg_dist_from_children(j) - n * self.profile_distance(prof_i, T) \
                     + self.get_avg_dist_from_children(i)
         lambd = 0.5 + numerator / (2 * (n - 2) * self.compute_variance(i, j))
+        if lambd < 0:
+            lambd = 0
+        if lambd > 1:
+            lambd = 1
         print(lambd)
         return lambd
 
@@ -134,27 +140,26 @@ class FastTree(object):
                @i: node number
                @n: number of active nodes
         """
-
         T = self.TOTAL_PROFILE
         n = len(self.ACTIVE)
         deltaii = self.get_avg_dist_from_children(i)
-        ans = (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
+        return (n * self.profile_distance(profile, T) - deltaii - (n - 2) * self.UPDIST[i]
                 - sum(list(self.UPDIST[x] for x in self.ACTIVE))) / (n - 2)
-        return ans
 
     def get_avg_dist_from_children(self, i):
         """
         :param i: the node to calculate avg distance of
         :return: the avg distance between node i and its children
         """
-        deltaii = self.profile_distance(self.PROFILES[i], self.PROFILES[i])
-        normaliser = 1
+        deltaii = 0
+        normaliser = 0
         children = self.CHILDREN[i]
-        for c1 in range(len(children)):
-            for c2 in range(c1, len(children)):
-                normaliser += 1
-                deltaii += self.profile_distance(self.PROFILES[children[c1]], self.PROFILES[children[c2]])
-        return deltaii / normaliser
+        for c1 in children:
+            normaliser += 1
+            deltaii += self.profile_distance(self.PROFILES[i], self.PROFILES[c1])
+        if normaliser != 0:
+            deltaii = deltaii / normaliser
+        return deltaii
 
     def merge_profiles(self, seq1, seq2, weight=0.5):
         """
@@ -288,9 +293,6 @@ class FastTree(object):
             self.initialize_nodes_tophits(keyNeighbor, distances_B, m)
         self.TOP_HITS[(keyA, keyB)] = self.TOP_HITS[(keyA, keyB)][:m] # only save the m top hits from the new node
 
-
-
-
     def neighborJoin(self):
 
         n = len(self.ACTIVE)
@@ -299,14 +301,15 @@ class FastTree(object):
             self.update_total_profile()
         self.ITERATION += 1
         # Base case
-        if n == 2:
+        if n < 3:
             # Pia: I don't think it makes sense to calculate the weights, up and out distances for the last join.
             # The formulas don't work with n=2 (division by 0) but we also don't need that info anymore after joining
             # everything. I think.
             n1, n2 = self.ACTIVE[0], self.ACTIVE[1]
-            self.CHILDREN[(n1, n2)] = [n1, n2]
+            self.CHILDREN[self.NODENUM] = [n1, n2]
             self.ACTIVE.remove(n1), self.ACTIVE.remove(n2)
-            self.ACTIVE.append((n1, n2))
+            self.ACTIVE.append(self.NODENUM)
+            self.NODENUM += 1
             return
 
         # Find min join criterion
@@ -318,17 +321,13 @@ class FastTree(object):
                 best_join = (nodeA, nodeB)
         i, j = self.SEQUENCES[best_join[0]], self.SEQUENCES[best_join[1]]
         newNode = (i,j)
+        newNode = self.NODENUM
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
         self.PROFILES[newNode] = self.merge_profiles(i, j, weight=weight)
-        # self.incr_total_profile(i,j,newNode)
-        # self.TOTAL_PROFILE -= np.array(self.PROFILES[i]) / n - np.array(self.PROFILES[j]) / n \
-        #                       + np.array(self.PROFILES[newNode]) / (n - 1)
         self.UPDIST[newNode] = self.get_updist(i, j, weight)
-
         self.VARIANCE_CORR[newNode] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
                                       + weight * (1 - weight) * self.compute_variance(i, j)
-
         self.ACTIVE.append(newNode)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
@@ -339,4 +338,5 @@ class FastTree(object):
             self.refresh_tophits(newNode)
         else:
             self.update_tophits(newNode)
+        self.NODENUM += 1
         return
