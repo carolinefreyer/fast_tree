@@ -265,7 +265,7 @@ class FastTree(object):
             seqB: newNode
         }
         for key, values in self.TOP_HITS.items():
-            self.TOP_HITS[key] = [replacements[x] for x in values]
+            self.TOP_HITS[key] = [replacements[x] for x in values if x in replacements]
 
     def refresh_tophits(self, newNode):
         """
@@ -286,7 +286,7 @@ class FastTree(object):
             distances_B = {(keyNeighbor, j): self.neighbor_join_criterion(keyNeighbor, j) for j in
                            self.TOP_HITS[newNode] if keyNeighbor != j}
             self.initialize_nodes_tophits(keyNeighbor, distances_B, m)
-        self.TOP_HITS[newNode = self.TOP_HITS[newNode][:m]  # only save the m top hits from the new node
+        self.TOP_HITS[newNode] = self.TOP_HITS[newNode][:m]  # only save the m top hits from the new node
 
     def neighborJoin(self):
 
@@ -314,8 +314,7 @@ class FastTree(object):
             join_value = self.neighbor_join_criterion(num_A, num_B)
             if join_value < best:
                 best_join = (num_A, num_B)
-        i, j = self.SEQUENCES[best_join[0]], self.SEQUENCES[best_join[1]]
-        newNode = (i,j)
+        i, j = best_join[0], best_join[1]
         newNode = self.NODENUM
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
