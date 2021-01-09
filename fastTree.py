@@ -412,14 +412,3 @@ class FastTree(object):
                 temp2 = self.SEQ_NAMES[temp2]
             str = "("+temp1 + ","+temp2+")"
             return str
-
-    # def branchLength(self):
-    #     blen = {}
-    #     for i in self.CHILDREN:
-    #         for j in self.CHILDREN[i]:
-    #             if j in self.SEQUENCES:
-    #                 blen[j] = self.corrected_distances(j,j)/2
-    #             else:
-    #                 blen[j] =
-
-
