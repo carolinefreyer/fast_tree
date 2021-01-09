@@ -272,7 +272,7 @@ class FastTree(object):
         self.PROFILES[root_child2] = newProfile
         return [root_child1,root_child2]
 
-    def recomputeProfiles(self):
+    def recomputeProfiles(self, root_child1, root_child2):
         """
         Recomputes profiles for each node in the unrooted tree after each iteration of nearest neighbour interchange.
         """
@@ -300,7 +300,7 @@ class FastTree(object):
                     edges_internal.append([i, j])
         #Make tree unrooted, needed to adjust profiles.
         [root_child1, root_child2] = self.makeUnRooted()
-        self.recomputeProfiles()
+        self.recomputeProfiles(root_child1, root_child2)
         #Run nearest neighbour interchange log(N) + 1 times.
         for _ in range(end):
             for i in edges_internal:
@@ -397,7 +397,7 @@ class FastTree(object):
         self.CHILDREN[root] = [root_child1, root_child2]
         self.CHILDREN[root_child2].remove(root_child1)
         self.CHILDREN[root_child1].remove(root_child2)
-        self.PROFILES[root] = self.merge_profiles(root_child1, root_child2, weight=0.5)
+        self.PROFILES[root] = None
         self.recomputeProfiles()
         return
 
