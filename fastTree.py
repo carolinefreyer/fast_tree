@@ -17,6 +17,7 @@ class FastTree(object):
         self.TOTAL_PROFILE = []
         self.ITERATION = 0
         self.VARIANCE_CORR = {}
+        self.BRANCH_LENGTHS = {}
 
     def initialize_sequences(self, filename):
         """
@@ -35,6 +36,7 @@ class FastTree(object):
             self.UPDIST[i] = 0
             self.VARIANCE_CORR[i] = 0
             self.ACTIVE.append(i)
+            self.BRANCH_LENGTHS[i] = 1
             s = self.SEQUENCES[i]
             freq = np.zeros((4, len(s)))
             for j in range(len(s)):
@@ -245,6 +247,7 @@ class FastTree(object):
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
                               + np.array(self.PROFILES[new_node])) / (n - 1)
+        self.BRANCH_LENGTHS[new_node] = 1
         self.NODENUM += 1
         return
 
@@ -391,10 +394,13 @@ class FastTree(object):
         self.CHILDREN[root] = [root_child1, root_child2]
         self.CHILDREN[root_child2].remove(root_child1)
         self.CHILDREN[root_child1].remove(root_child2)
+        self.PROFILES[root] = self.merge_profiles(root_child1, root_child2, weight=0.5)
+        self.UPDIST[root] = 0.5*(self.UPDIST[root_child1] + self.UPDIST[root_child2]) + self.uncorrected_distance(root_child1, root_child2)
+        self.recomputeProfiles()
         return
 
 
-    def newickFormat(self,i,str):
+    def newickFormat(self,i,res):
         """
         Recursively constructs tree in newick format.
         :param i: current node
@@ -404,11 +410,69 @@ class FastTree(object):
         if len(self.CHILDREN[i]) == 0:
             return i
         else:
-            temp1 = self.newickFormat(self.CHILDREN[i][0],str)
-            temp2 = self.newickFormat(self.CHILDREN[i][1],str)
+            temp1 = self.newickFormat(self.CHILDREN[i][0],res)
+            temp2 = self.newickFormat(self.CHILDREN[i][1],res)
             if type(temp1) is int:
-                temp1 = self.SEQ_NAMES[temp1]
+                temp1 = self.SEQ_NAMES[temp1] + ":" + str(self.BRANCH_LENGTHS[self.CHILDREN[i][0]])
             if type(temp2) is int:
-                temp2 = self.SEQ_NAMES[temp2]
-            str = "("+temp1 + ","+temp2+")"
-            return str
+                temp2 = self.SEQ_NAMES[temp2] + ":" + str(self.BRANCH_LENGTHS[self.CHILDREN[i][1]])
+            if i != self.ACTIVE[0]:
+                res = "(" + temp1 + "," + temp2 + "):" + str(self.BRANCH_LENGTHS[i])
+            else:
+                res = "(" + temp1 + "," + temp2 + ")"
+            return res
+
+    def findFamilyLeaf(self, node):
+        for p in self.CHILDREN:
+            if node in self.CHILDREN[p]:
+                parent = p
+        for g in self.CHILDREN:
+            if parent in self.CHILDREN[g]:
+                grandparent = g
+        if node == self.CHILDREN[parent][0]:
+            sibling = self.CHILDREN[parent][1]
+        else:
+            sibling = self.CHILDREN[parent][0]
+        return sibling, grandparent
+
+    def findFamilyInternal(self, node):
+        [child1, child2] = self.CHILDREN[node]
+        for p in self.CHILDREN:
+            if node in self.CHILDREN[p]:
+                parent = p
+        if node == self.CHILDREN[parent][0]:
+            sibling = self.CHILDREN[parent][1]
+        else:
+            sibling = self.CHILDREN[parent][0]
+        return child1, child2, parent, sibling
+
+    def computeBranchLenghts(self):
+        root = self.ACTIVE[0]
+        root_child1 = self.CHILDREN[root][0]
+        root_child2 = self.CHILDREN[root][1]
+
+        #compute branch lengths for root_child1 and 2
+        self.recLength(root_child1)
+        self.recLength(root_child2)
+
+
+    def recLength(self, node):
+        if len(self.CHILDREN[node]) == 0:
+            # leaf
+            sibling, grandparent = self.findFamilyLeaf(node)
+            d_i_g = self.corrected_distances(node,grandparent)
+            d_i_s = self.corrected_distances(node,sibling)
+            d_s_g = self.corrected_distances(sibling, grandparent)
+            self.BRANCH_LENGTHS[node] = round((d_i_g + d_i_s -d_s_g)/2,3)
+        else:
+            #internal
+            child1, child2, parent, sibling = self.findFamilyInternal(node)
+            d_c1_p = self.corrected_distances(child1, parent)
+            d_c2_p = self.corrected_distances(child2, parent)
+            d_c1_s = self.corrected_distances(child1, sibling)
+            d_c2_s = self.corrected_distances(child2, sibling)
+            d_c1_c2 = self.corrected_distances(child1, child2)
+            d_s_p = self.corrected_distances(sibling, parent)
+            self.BRANCH_LENGTHS[node] = round((d_c1_p + d_c2_p + d_c1_s + d_c2_s )/4 - (d_c1_c2+d_s_p)/2,3)
+            self.recLength(child1)
+            self.recLength(child2)
