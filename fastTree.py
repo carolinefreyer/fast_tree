@@ -252,13 +252,14 @@ class FastTree(object):
         """
         Unroots rooted tree for the nearest neighbourhood interchange.
         """
-        root_child1 = self.ACTIVE[0][0]
-        root_child2 = self.ACTIVE[0][1]
+        root = self.ACTIVE[0]
+        root_child1 = self.CHILDREN[root][0]
+        root_child2 = self.CHILDREN[root][1]
         #Join root_child1 and root_child2
         self.CHILDREN[root_child2].append(root_child1)
         self.CHILDREN[root_child1].append(root_child2)
         #Remove root
-        del self.CHILDREN[(root_child1,root_child2)]
+        del self.CHILDREN[root]
         #Compute profile of new join
         newProfile = self.merge_profiles(root_child1, root_child2, weight=0.5)
         self.PROFILES[root_child1] = newProfile
@@ -292,7 +293,8 @@ class FastTree(object):
                 if j not in self.SEQUENCES:
                     edges_internal.append([i, j])
         #Make tree unrooted, needed to adjust profiles.
-        [n1, n2] = self.makeUnRooted()
+        [root_child1, root_child2] = self.makeUnRooted()
+        self.recomputeProfiles()
         #Run nearest neighbour interchange log(N) + 1 times.
         for _ in range(end):
             for i in edges_internal:
@@ -306,12 +308,12 @@ class FastTree(object):
                 if i[1] in self.CHILDREN[i[0]]:
                     #if one of the nodes is a child of the root.
                     if len(self.CHILDREN[i[0]]) == 3:
-                        if n1 in self.CHILDREN[i[0]]:
-                            [A] = [j for j in self.CHILDREN[i[0]] if j !=i[1] and j!=n1]
-                            B = n1
+                        if root_child1 in self.CHILDREN[i[0]]:
+                            [A] = [j for j in self.CHILDREN[i[0]] if j !=i[1] and j!=root_child1]
+                            B = root_child1
                         else:
-                            [A] = [j for j in self.CHILDREN[i[0]] if j != i[1] and j != n2]
-                            B = n2
+                            [A] = [j for j in self.CHILDREN[i[0]] if j != i[1] and j != root_child2]
+                            B = root_child2
                     else:
                         if i[1] == A:
                             A = self.CHILDREN[i[0]][1]
@@ -322,12 +324,12 @@ class FastTree(object):
                 if i[0] in self.CHILDREN[i[1]]:
                     # if one of the nodes is a child of the root.
                     if len(self.CHILDREN[i[1]]) == 3:
-                        if n1 in self.CHILDREN[i[1]]:
-                            [C] = [j for j in self.CHILDREN[i[1]] if j !=i[0] and j!=n1]
-                            D = n1
+                        if root_child1 in self.CHILDREN[i[1]]:
+                            [C] = [j for j in self.CHILDREN[i[1]] if j !=i[0] and j!=root_child1]
+                            D = root_child1
                         else:
-                            [C] = [j for j in self.CHILDREN[i[1]] if j != i[0] and j != n2]
-                            D = n2
+                            [C] = [j for j in self.CHILDREN[i[1]] if j != i[0] and j != root_child2]
+                            D = root_child2
                     else:
                         if i[0] == C:
                             C = self.CHILDREN[i[1]][1]
@@ -345,6 +347,7 @@ class FastTree(object):
 
                 if dACBD < min(dABCD,dADBC):
                     #Switch B and C
+                    print("Switch B and C")
                     if B not in self.CHILDREN[i[0]]:
                         self.CHILDREN[i[0]] = [A, C]
                         self.CHILDREN[i[1]] = [D, i[0]]
@@ -361,6 +364,7 @@ class FastTree(object):
 
                 elif dADBC < min(dABCD, dACBD):
                     #Switch B and D
+                    print("Switch B and D")
                     if B not in self.CHILDREN[i[0]]:
                         self.CHILDREN[i[0]] = [A, D]
                         self.CHILDREN[i[1]] = [C, i[0]]
@@ -383,9 +387,10 @@ class FastTree(object):
 
                 self.recomputeProfiles()
         #Make tree rooted again before returning.
-        self.CHILDREN[(n1, n2)] = [n1, n2]
-        self.CHILDREN[n2].remove(n1)
-        self.CHILDREN[n1].remove(n2)
+        root = max(root_child1, root_child2) +1
+        self.CHILDREN[root] = [root_child1, root_child2]
+        self.CHILDREN[root_child2].remove(root_child1)
+        self.CHILDREN[root_child1].remove(root_child2)
         return
 
 
@@ -401,6 +406,10 @@ class FastTree(object):
         else:
             temp1 = self.newickFormat(self.CHILDREN[i][0],str)
             temp2 = self.newickFormat(self.CHILDREN[i][1],str)
+            if type(temp1) is int:
+                temp1 = self.SEQ_NAMES[temp1]
+            if type(temp2) is int:
+                temp2 = self.SEQ_NAMES[temp2]
             str = "("+temp1 + ","+temp2+")"
             return str
 
