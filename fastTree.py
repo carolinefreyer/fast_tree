@@ -7,6 +7,7 @@ ACGT_DIS = [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
 class FastTree(object):
     def __init__(self):
         # Dictionary holding sequences indexed by name
+        self.SEQ_NAMES = {}
         self.SEQUENCES = {}
         self.PROFILES = {}
         self.CHILDREN = {}
@@ -27,32 +28,30 @@ class FastTree(object):
         for i in range(int(len(lines) / 2)):
             name = lines[2 * i].strip()[1:]
             sequence = lines[2 * i + 1].strip()
-            self.SEQUENCES[name] = sequence
-        for seq in self.SEQUENCES:
-            self.CHILDREN[seq] = []
+            self.SEQ_NAMES[i] = name
+            self.SEQUENCES[i] = sequence
+            self.CHILDREN[i] = []
             # Updist and variance correction zero for all leaves
-            self.UPDIST[seq] = 0
-            self.VARIANCE_CORR[seq] = 0
-            self.ACTIVE.append(seq)
-            #Compute profiles for each of the sequences
-            s = self.SEQUENCES[seq]
+            self.UPDIST[i] = 0
+            self.VARIANCE_CORR[i] = 0
+            self.ACTIVE.append(i)
+            s = self.SEQUENCES[i]
             freq = np.zeros((4, len(s)))
-            for i in range(len(s)):
-                if s[i] == 'A':
-                    freq[0][i] = 1
-                elif s[i] == 'C':
-                    freq[1][i] = 1
-                elif s[i] == 'G':
-                    freq[2][i] = 1
-                elif s[i] == 'T':
-                    freq[3][i] = 1
-            self.PROFILES[seq] = freq
+            for j in range(len(s)):
+                if s[j] == 'A':
+                    freq[0][j] = 1
+                elif s[j] == 'C':
+                    freq[1][j] = 1
+                elif s[j] == 'G':
+                    freq[2][j] = 1
+                elif s[j] == 'T':
+                    freq[3][j] = 1
+            self.PROFILES[i] = freq
+            self.NODENUM += 1
 
     def update_total_profile(self):
-        """
-        Calculates the average of all active nodes profiles.
-        :returns: 4xL matrix with the average frequency count of each nucleotide over all profiles
-        """
+        """Calculates the average of all active nodes profiles
+        :return: 4xL matrix with the average frequency count of each nucleotide over all profiles"""
         seqs = self.ACTIVE
         L = len(seqs)
         profiles = [self.PROFILES[x] for x in seqs]
@@ -224,17 +223,17 @@ class FastTree(object):
         # Base case
         if n < 3:
             i, j = self.ACTIVE[0], self.ACTIVE[1]
-            self.CHILDREN[(i, j)] = [i, j]
-            # (i,j) becomes the root of the tree.
+            self.CHILDREN[self.NODENUM] = [i, j]
+            # Makes the root of the tree with children i and j.
             self.ACTIVE.remove(i), self.ACTIVE.remove(j)
-            self.ACTIVE.append((i, j))
+            self.ACTIVE.append(self.NODENUM)
+            self.NODENUM += 1
             return
 
         # Find min join criterion
         distances = {(i, j): self.neighbor_join_criterion(i, j) for i in self.ACTIVE for j in self.ACTIVE if i != j}
-        new_node = min(distances, key=distances.get)
-        i, j = new_node
-
+        i,j = min(distances, key=distances.get)
+        new_node = self.NODENUM
         weight = self.compute_weight(i, j, n)
 
         self.CHILDREN[new_node] = [i, j]
@@ -246,6 +245,7 @@ class FastTree(object):
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE)*n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
                               + np.array(self.PROFILES[new_node])) / (n - 1)
+        self.NODENUM += 1
         return
 
     def makeUnRooted(self):
