@@ -228,6 +228,8 @@ class FastTree(object):
             self.CHILDREN[self.NODENUM] = [i, j]
             # Makes the root of the tree with children i and j.
             self.ACTIVE.remove(i), self.ACTIVE.remove(j)
+            self.PROFILES[self.NODENUM] = self.merge_profiles(i, j)
+            self.UPDIST[self.NODENUM] = self.get_updist(i, j, 0.5)
             self.ACTIVE.append(self.NODENUM)
             self.NODENUM += 1
             return
@@ -263,6 +265,7 @@ class FastTree(object):
         self.CHILDREN[root_child1].append(root_child2)
         #Remove root
         del self.CHILDREN[root]
+        del self.PROFILES[root]
         #Compute profile of new join
         newProfile = self.merge_profiles(root_child1, root_child2, weight=0.5)
         self.PROFILES[root_child1] = newProfile
@@ -395,7 +398,6 @@ class FastTree(object):
         self.CHILDREN[root_child2].remove(root_child1)
         self.CHILDREN[root_child1].remove(root_child2)
         self.PROFILES[root] = self.merge_profiles(root_child1, root_child2, weight=0.5)
-        self.UPDIST[root] = 0.5*(self.UPDIST[root_child1] + self.UPDIST[root_child2]) + self.uncorrected_distance(root_child1, root_child2)
         self.recomputeProfiles()
         return
 
@@ -451,7 +453,6 @@ class FastTree(object):
         root_child1 = self.CHILDREN[root][0]
         root_child2 = self.CHILDREN[root][1]
 
-        #compute branch lengths for root_child1 and 2
         self.recLength(root_child1)
         self.recLength(root_child2)
 
@@ -473,6 +474,6 @@ class FastTree(object):
             d_c2_s = self.corrected_distances(child2, sibling)
             d_c1_c2 = self.corrected_distances(child1, child2)
             d_s_p = self.corrected_distances(sibling, parent)
-            self.BRANCH_LENGTHS[node] = round((d_c1_p + d_c2_p + d_c1_s + d_c2_s )/4 - (d_c1_c2+d_s_p)/2,3)
+            self.BRANCH_LENGTHS[node] = round((d_c1_p + d_c2_p + d_c1_s + d_c2_s)/4 - (d_c1_c2+d_s_p)/2,3)
             self.recLength(child1)
             self.recLength(child2)
