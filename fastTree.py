@@ -228,8 +228,8 @@ class FastTree(object):
             self.CHILDREN[self.NODENUM] = [i, j]
             # Makes the root of the tree with children i and j.
             self.ACTIVE.remove(i), self.ACTIVE.remove(j)
-            self.PROFILES[self.NODENUM] = self.merge_profiles(i, j)
-            self.UPDIST[self.NODENUM] = self.get_updist(i, j, 0.5)
+            self.PROFILES[self.NODENUM] = self.merge_profiles(i, j, 0.5)
+            self.UPDIST[self.NODENUM] = 0.5*(self.UPDIST[i] + self.UPDIST[j]) + self.uncorrected_distance(i,j)
             self.ACTIVE.append(self.NODENUM)
             self.NODENUM += 1
             return
