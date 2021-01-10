@@ -272,17 +272,32 @@ class FastTree(object):
         self.PROFILES[root_child2] = newProfile
         return [root_child1,root_child2]
 
-    def recomputeProfiles(self):
+    def recomputeProfiles(self, root_child1, root_child2):
         """
         Recomputes profiles for each node in the unrooted tree after each iteration of nearest neighbour interchange.
         """
         for n in self.PROFILES:
             if n not in self.SEQUENCES:
-                profiles = [self.PROFILES[x] for x in self.CHILDREN[n]]
-                profile = profiles[0]
-                for p in profiles[1:]:
-                    profile = [[sum(x) for x in zip(profile[i], p[i])] for i in range(4)]
-                self.PROFILES[n] = [[t / len(self.CHILDREN[n]) for t in row] for row in profile]
+                if n not in [root_child1, root_child2]:
+                    profiles = [self.PROFILES[x] for x in self.CHILDREN[n]]
+                    profile = profiles[0]
+                    for p in profiles[1:]:
+                        profile = [[sum(x) for x in zip(profile[i], p[i])] for i in range(4)]
+                    self.PROFILES[n] = [[t / len(self.CHILDREN[n]) for t in row] for row in profile]
+
+        profiles1 = [self.PROFILES[x] for x in self.CHILDREN[root_child1] if x != root_child2]
+        profiles2 = [self.PROFILES[x] for x in self.CHILDREN[root_child2] if x != root_child1]
+        profile1 = profiles1[0]
+        profile2 = profiles2[0]
+        for p in profiles1[1:]:
+            profile1 = [[sum(x) for x in zip(profile1[i], p[i])] for i in range(4)]
+        for p in profiles2[1:]:
+            profile2 = [[sum(x) for x in zip(profile2[i], p[i])] for i in range(4)]
+        profile1 = [[0.5*t / (len(self.CHILDREN[root_child1])-1) for t in row] for row in profile1]
+        profile2 = [[0.5*t / (len(self.CHILDREN[root_child2]) - 1) for t in row] for row in profile2]
+        profile = np.add(profile1, profile2).tolist()
+        self.PROFILES[root_child1] = profile
+        self.PROFILES[root_child2] = profile
 
     def nearestNeighbourInterchange(self):
         """
@@ -300,7 +315,7 @@ class FastTree(object):
                     edges_internal.append([i, j])
         #Make tree unrooted, needed to adjust profiles.
         [root_child1, root_child2] = self.makeUnRooted()
-        self.recomputeProfiles()
+        self.recomputeProfiles(root_child1, root_child2)
         #Run nearest neighbour interchange log(N) + 1 times.
         for _ in range(end):
             for i in edges_internal:
@@ -391,14 +406,14 @@ class FastTree(object):
                         self.CHILDREN[i[0]].append(D)
                         self.CHILDREN[i[1]].append(B)
 
-                self.recomputeProfiles()
+                self.recomputeProfiles(root_child1, root_child2)
         #Make tree rooted again before returning.
         root = max(root_child1, root_child2) +1
         self.CHILDREN[root] = [root_child1, root_child2]
         self.CHILDREN[root_child2].remove(root_child1)
         self.CHILDREN[root_child1].remove(root_child2)
-        self.PROFILES[root] = None
-        self.recomputeProfiles()
+        self.recomputeProfiles(root_child1, root_child2)
+        self.PROFILES[root] = self.merge_profiles(root_child1, root_child2,0.5)
         return
 
 
