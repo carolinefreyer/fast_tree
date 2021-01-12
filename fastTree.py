@@ -214,7 +214,7 @@ class FastTree(object):
             # add element to the top hits list
             if num not in self.TOP_HITS:
                 self.TOP_HITS.update({num:[neighbor]})
-            else:
+            elif neighbor not in self.TOP_HITS[num]:
                 self.TOP_HITS[num].append(neighbor)
 
     def initialize_top_hits(self):
@@ -248,13 +248,27 @@ class FastTree(object):
         """
         seqA, seqB = self.CHILDREN[newNode]
         # compute the top-hits for the new node
-        top_hitsA, top_hitsB = self.TOP_HITS.get(seqA), self.TOP_HITS.get(seqB)
+        #top_hitsA, top_hitsB = self.TOP_HITS.get(seqA), self.TOP_HITS.get(seqB)
+        if seqA in self.TOP_HITS.keys():
+            top_hitsA = self.TOP_HITS.get(seqA) if self.TOP_HITS.get(seqA) != None else []
+            self.TOP_HITS.pop(seqA)
+        else:
+            top_hitsA = []
+        if seqB in self.TOP_HITS.keys():
+            top_hitsB = self.TOP_HITS.get(seqB) if self.TOP_HITS.get(seqB) != None else []
+            self.TOP_HITS.pop(seqB)
+        else:
+            top_hitsB = []
         candidates = [i for i in set(top_hitsA + top_hitsB) if i != seqA and i != seqB]  # remove duplicates
         distances = {(newNode, j): self.neighbor_join_criterion(newNode, j) for j in candidates}
+        #self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
         m = int(math.sqrt(len(self.ACTIVE)))
         self.initialize_nodes_tophits(newNode, distances, m)
-        self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
+        # self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
         # TODO: compare each of the new nodes top-hits to each other
+        if newNode not in self.TOP_HITS.keys():
+            self.refresh_tophits(newNode)
+            return
         for i in self.TOP_HITS[newNode]:
             distances = {(i, j): self.neighbor_join_criterion(i, j) for j in
                          self.TOP_HITS[newNode] if i != j}
@@ -267,6 +281,7 @@ class FastTree(object):
         for key, values in self.TOP_HITS.items():
             self.TOP_HITS[key] = list(set([replacements[x] if x in replacements.keys() else x for x in values]))
 
+
     def refresh_tophits(self, newNode):
         """
         If the top hits list are too small this function recomputes the top-hit for the new joined node and
@@ -275,7 +290,7 @@ class FastTree(object):
         :return:
         """
         self.TOP_HITS.clear()
-        seqA, seqB = self.CHILDREN[newNode]
+        self.BEST_JOINS.clear()
         # compute the top-hits for the new node
         distances_A = {(newNode, j): self.neighbor_join_criterion(newNode, j) for j in self.ACTIVE if
                        newNode != j}
@@ -283,8 +298,10 @@ class FastTree(object):
         self.initialize_nodes_tophits(newNode, distances_A, 2 * m)
         for i in range(m):
             keyNeighbor = self.TOP_HITS[newNode][i]
+            #distances_B = {(keyNeighbor, j): self.neighbor_join_criterion(keyNeighbor, j) for j in
+                           #self.TOP_HITS[newNode] if keyNeighbor != j}
             distances_B = {(keyNeighbor, j): self.neighbor_join_criterion(keyNeighbor, j) for j in
-                           self.TOP_HITS[newNode] if keyNeighbor != j}
+                           self.ACTIVE if keyNeighbor != j}
             self.initialize_nodes_tophits(keyNeighbor, distances_B, m)
         self.TOP_HITS[newNode] = self.TOP_HITS[newNode][:m]  # only save the m top hits from the new node
 
@@ -294,6 +311,20 @@ class FastTree(object):
             if self.BEST_JOINS[x] == i or self.BEST_JOINS[x] == j or x == i or x == j:
                 del self.BEST_JOINS[x]
 
+    def newickFormat(self, i, str):
+        """
+        Recursively constructs tree in newick format.
+        :param i: current node
+        :param str: newick format for ancestors of i.
+        :returns: newick format of tree rooted at i.
+        """
+        if len(self.CHILDREN[i]) == 0:
+            return self.SEQ_NAMES[i]
+        else:
+            temp1 = self.newickFormat(self.CHILDREN[i][0], str)
+            temp2 = self.newickFormat(self.CHILDREN[i][1], str)
+            str = "(" + temp1 + "," + temp2 + ")"
+            return str
 
     def neighborJoin(self):
 
@@ -323,10 +354,6 @@ class FastTree(object):
                 best = join_value
                 best_join = (num_A, num_B)
         i, j = best_join[0], best_join[1]
-        # if i in self.BEST_JOINS:
-        #     del self.BEST_JOINS[i]
-        # if j in self.BEST_JOINS:
-        #     del self.BEST_JOINS[j]
         newNode = self.NODENUM
         weight = self.compute_weight(i, j, n)
         self.CHILDREN[newNode] = [i, j]
@@ -341,9 +368,9 @@ class FastTree(object):
         # TODO: Place at appropriate position and incoorparate into joining function
         m = int(math.sqrt(len(self.ACTIVE)))
         self.update_best_joins(i,j)
-       #if len(self.TOP_HITS.keys()) < 0.8 * m: # how to remove already joined nodes if refreshing is not necessary ???
-        self.refresh_tophits(newNode)
-        # else:
-        #     self.update_tophits(newNode)
+        if len(self.TOP_HITS.keys()) < 0.8 * m: # how to remove already joined nodes if refreshing is not necessary ???
+            self.refresh_tophits(newNode)
+        else:
+            self.update_tophits(newNode)
         self.NODENUM += 1
         return

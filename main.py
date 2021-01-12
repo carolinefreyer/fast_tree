@@ -8,4 +8,8 @@ def run():
     while(len(tree.ACTIVE)>1):
         tree.neighborJoin()
     #print(tree.ACTIVE)
+    newickFormat = tree.newickFormat(tree.ACTIVE[0], "")
+    newickFormat += ";"
+    print(newickFormat)
+
 run()
