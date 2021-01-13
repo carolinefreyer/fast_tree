@@ -422,6 +422,16 @@ class FastTree(object):
         self.PROFILES[root] = self.merge_profiles(root_child1, root_child2,0.5)
         return
 
+    def reComputeProfilesBranchLengths(self):
+        n = len(self.SEQUENCES)
+        for i in self.CHILDREN:
+            if len(self.CHILDREN[i]) != 0:
+                if n !=2:
+                    weight = self.compute_weight(self.CHILDREN[i][0], self.CHILDREN[i][1], n)
+                else:
+                    weight = 0.5
+                self.PROFILES[i] = self.merge_profiles(self.CHILDREN[i][0], self.CHILDREN[i][1], weight=weight)
+                n -=1
 
     def newickFormat(self,i,res):
         """
@@ -470,12 +480,10 @@ class FastTree(object):
         return child1, child2, parent, sibling
 
     def computeBranchLenghts(self):
+        self.reComputeProfilesBranchLengths()
         root = self.ACTIVE[0]
-        root_child1 = self.CHILDREN[root][0]
-        root_child2 = self.CHILDREN[root][1]
-
-        self.recLength(root_child1)
-        self.recLength(root_child2)
+        self.recLength(self.CHILDREN[root][0])
+        self.recLength(self.CHILDREN[root][1])
 
 
     def recLength(self, node):
