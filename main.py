@@ -8,8 +8,8 @@ def run():
         tree.neighborJoin()
     tree.computeBranchLenghts()
 
-    # tree.nearestNeighbourInterchange()
-    # tree.computeBranchLenghts()
+    tree.nearestNeighbourInterchange()
+    tree.computeBranchLenghts()
     newickFormat = tree.newickFormat(tree.ACTIVE[0],"")
     newickFormat += ";"
     print(newickFormat)
