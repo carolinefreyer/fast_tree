@@ -266,7 +266,7 @@ class FastTree(object):
         #Remove root
         del self.CHILDREN[root]
         del self.PROFILES[root]
-        #Compute profile of new join
+        #Compute profile of new join: unweighted average of the profiles of the children.
         newProfile = self.merge_profiles(root_child1, root_child2, weight=0.5)
         self.PROFILES[root_child1] = newProfile
         self.PROFILES[root_child2] = newProfile
@@ -293,7 +293,7 @@ class FastTree(object):
             profile1 = [[sum(x) for x in zip(profile1[i], p[i])] for i in range(4)]
         for p in profiles2[1:]:
             profile2 = [[sum(x) for x in zip(profile2[i], p[i])] for i in range(4)]
-        profile1 = [[0.5*t / (len(self.CHILDREN[root_child1])-1) for t in row] for row in profile1]
+        profile1 = [[0.5*t / (len(self.CHILDREN[root_child1]) - 1) for t in row] for row in profile1]
         profile2 = [[0.5*t / (len(self.CHILDREN[root_child2]) - 1) for t in row] for row in profile2]
         profile = np.add(profile1, profile2).tolist()
         self.PROFILES[root_child1] = profile

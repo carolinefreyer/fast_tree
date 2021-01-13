@@ -7,6 +7,7 @@ def run():
     while(len(tree.ACTIVE)>1):
         tree.neighborJoin()
     tree.computeBranchLenghts()
+
     # tree.nearestNeighbourInterchange()
     # tree.computeBranchLenghts()
     newickFormat = tree.newickFormat(tree.ACTIVE[0],"")
