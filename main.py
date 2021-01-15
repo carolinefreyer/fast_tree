@@ -6,6 +6,8 @@ def run():
     tree.initialize_sequences('fasttree-reallysmall.aln')
     while(len(tree.ACTIVE)>1):
         tree.neighborJoin()
+    newickFormat = tree.newickFormat(tree.ACTIVE[0], "")
+    newickFormat += ";"
+    print(newickFormat)
 
-    print(tree.ACTIVE)
 run()

@@ -228,3 +228,19 @@ class FastTree(object):
                               + np.array(self.PROFILES[newNode])) / (n - 1)
         self.NODENUM += 1
         return
+
+    def newickFormat(self, i, str):
+        """
+        Recursively constructs tree in newick format.
+        :param i: current node
+        :param str: newick format for ancestors of i.
+        :returns: newick format of tree rooted at i.
+        """
+        if len(self.CHILDREN[i]) == 0:
+            return self.SEQ_NAMES[i]
+        else:
+            temp1 = self.newickFormat(self.CHILDREN[i][0], str)
+            temp2 = self.newickFormat(self.CHILDREN[i][1], str)
+            str = "(" + temp1 + "," + temp2 + ")"
+            return str
+
