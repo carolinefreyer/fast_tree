@@ -4,6 +4,7 @@ import fastTree as ft
 def run():
     tree = ft.FastTree()
     tree.initialize_sequences('fasttree-reallysmall.aln')
+    tree.initialize_top_hits()
     while(len(tree.ACTIVE)>1):
         tree.neighborJoin()
     newickFormat = tree.newickFormat(tree.ACTIVE[0], "")
