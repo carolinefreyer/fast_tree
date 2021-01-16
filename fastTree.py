@@ -248,7 +248,6 @@ class FastTree(object):
         """
         seqA, seqB = self.CHILDREN[newNode]
         # compute the top-hits for the new node
-        #top_hitsA, top_hitsB = self.TOP_HITS.get(seqA), self.TOP_HITS.get(seqB)
         if seqA in self.TOP_HITS.keys():
             top_hitsA = self.TOP_HITS.get(seqA) if self.TOP_HITS.get(seqA) != None else []
             self.TOP_HITS.pop(seqA)
@@ -261,11 +260,9 @@ class FastTree(object):
             top_hitsB = []
         candidates = [i for i in set(top_hitsA + top_hitsB) if i != seqA and i != seqB]  # remove duplicates
         distances = {(newNode, j): self.neighbor_join_criterion(newNode, j) for j in candidates}
-        #self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
         m = int(math.sqrt(len(self.ACTIVE)))
         self.initialize_nodes_tophits(newNode, distances, m)
-        # self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
-        # TODO: compare each of the new nodes top-hits to each other
+        # compare each of the new nodes top-hits to each other
         if newNode not in self.TOP_HITS.keys():
             self.refresh_tophits(newNode)
             return
@@ -273,7 +270,7 @@ class FastTree(object):
             distances = {(i, j): self.neighbor_join_criterion(i, j) for j in
                          self.TOP_HITS[newNode] if i != j}
             self.initialize_nodes_tophits(i, distances, m)
-        # TODO: for all other nodes that either have nodeA or nodeB in their tophits replace with newNode
+        # replace all pointers to either nodeA or nodeB with a pointer to the new node
         replacements = {
             seqA: newNode,
             seqB: newNode
@@ -284,10 +281,10 @@ class FastTree(object):
 
     def refresh_tophits(self, newNode):
         """
-        If the top hits list are too small this function recomputes the top-hit for the new joined node and
-        updates the top-hits lists of the net node's top hits.
-        :param newNode:
-        :return:
+        This function entirely recomputes the top hits list, by computing the top-hits for the joined node and
+        calculating the top-hits for the best m top-hits of the new Node
+        :param newNode: reference value for new node
+        :return: updated top-hits dictionary
         """
         self.TOP_HITS.clear()
         self.BEST_JOINS.clear()
@@ -296,6 +293,7 @@ class FastTree(object):
                        newNode != j}
         m = int(math.sqrt(len(self.ACTIVE)))
         self.initialize_nodes_tophits(newNode, distances_A, 2 * m)
+        # compute the top-hits for the best m top-hits of the new Node
         for i in range(m):
             keyNeighbor = self.TOP_HITS[newNode][i]
             #distances_B = {(keyNeighbor, j): self.neighbor_join_criterion(keyNeighbor, j) for j in
@@ -306,6 +304,11 @@ class FastTree(object):
         self.TOP_HITS[newNode] = self.TOP_HITS[newNode][:m]  # only save the m top hits from the new node
 
     def update_best_joins(self, i, j):
+        """
+        Removes entries in the best join dictionary that reference a non-active node
+        :param i, j: node values
+        :return: best joins dictionary with only active nodes
+        """
         copy = dict(self.BEST_JOINS)
         for x in copy:
             if self.BEST_JOINS[x] == i or self.BEST_JOINS[x] == j or x == i or x == j:
