@@ -243,18 +243,23 @@ class FastTree(object):
         out_distances = {}
         for seq_num in self.ACTIVE:
             out_distances.update({seq_num: self.out_distance(self.PROFILES[seq_num], seq_num)})
-        num_A = sorted(out_distances.keys(), key=lambda item: out_distances[item])[0]
-        # 2: find top-hits list for node A
-        distances_A = {(num_A, j): self.neighbor_join_criterion(num_A, j) for j in self.ACTIVE if num_A != j}
+        # all nodes sorted by out distance
+        srt = sorted(out_distances.keys(), key=lambda item: out_distances[item])
         m = int(math.sqrt(len(self.ACTIVE)))
-        self.initialize_nodes_tophits(num_A, distances_A, 2*m)
-        # 3: check if restriction du(A,B) <= 0.75 * du(1,H_2m) holds
-        if self.uncorrected_distance(num_A, self.TOP_HITS[num_A][0]) <= 0.75 * self.uncorrected_distance(num_A, self.TOP_HITS[num_A][-1]):
-            # 4: evaluate top-hits for m neighbours within node A's top-hits
-            for i in range(m):
-                num_B = self.TOP_HITS[num_A][i]
-                distances_B = {(num_B, j): self.neighbor_join_criterion(num_B, j) for j in self.TOP_HITS[num_A] if num_B != j}
-                self.initialize_nodes_tophits(num_B, distances_B, m)
+        while len(srt) > 0:
+            num_A = srt[0]
+            # 2: find top-hits list for node A
+            distances_A = {(num_A, j): self.neighbor_join_criterion(num_A, j) for j in self.ACTIVE if num_A != j}
+            self.initialize_nodes_tophits(num_A, distances_A, m)
+            distances_A = [x[1] for x in sorted(distances_A.keys(), key=lambda item: distances_A[item])]
+            srt = srt[1:]
+            # 3: check if restriction du(A,B) <= 0.75 * du(1,H_2m) holds
+            for num_B in self.TOP_HITS[num_A]:
+                if self.uncorrected_distance(num_A, num_B) <= 0.5 * self.uncorrected_distance(num_A, distances_A[2*m-1]):
+                    # 4: evaluate top-hits for m neighbours within node A's top-hits
+                    distances_B = {(num_B, j): self.neighbor_join_criterion(num_B, j) for j in distances_A[:2*m] if num_B != j}
+                    self.initialize_nodes_tophits(num_B, distances_B, m)
+                    srt = srt[1:]
 
     def update_tophits(self, newNode, m):
         """
@@ -386,7 +391,7 @@ class FastTree(object):
                               + np.array(self.PROFILES[new_node])) / (n - 1)
         # TODO: Place at appropriate position and incoorparate into joining function
         if len(self.ACTIVE) > 2:
-            m = int(math.sqrt(len(self.ACTIVE)))
+            m = int(math.sqrt(len(self.SEQUENCES)))
             self.update_best_joins(i,j)
             if len(self.TOP_HITS.keys()) < 0.8 * m: # how to remove already joined nodes if refreshing is not necessary ???
                 self.refresh_tophits(new_node, m)
