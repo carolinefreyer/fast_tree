@@ -465,7 +465,6 @@ class FastTree(object):
 
         # Make tree unrooted, needed to adjust profiles.
         [root_child1, root_child2] = self.makeUnRooted()
-
         end = int(np.log2(len(self.SEQUENCES)) + 1)
         # Run nearest neighbour interchange log(N) + 1 times.
         for _ in range(end):
@@ -516,6 +515,7 @@ class FastTree(object):
                 if dACBD < min(dABCD, dADBC):
                     # Switch B and C
                     print("Switch B and C")
+                    print(i[0], i[1])
                     if B not in self.CHILDREN[i[0]]:
                         self.CHILDREN[i[0]] = [A, C]
                         self.CHILDREN[i[1]] = [D, i[0]]
@@ -523,11 +523,11 @@ class FastTree(object):
                         self.CHILDREN[B].append(i[1])
                         edges_internal.remove([B, i[0]])
                         edges_internal.append([B, i[1]])
-                        if B == root_child1:
-                            root_child2 = i[1]
-                            self.CHILDREN[i[1]].append(B)
-                        if B == root_child2:
+                        if i[0] == root_child1:
                             root_child1 = i[1]
+                            self.CHILDREN[i[1]].append(B)
+                        if i[0] == root_child2:
+                            root_child2 = i[1]
                             self.CHILDREN[i[1]].append(B)
                     else:
                         self.CHILDREN[i[0]].remove(B)
@@ -544,13 +544,13 @@ class FastTree(object):
                         self.CHILDREN[i[1]] = [C, i[0]]
                         self.CHILDREN[B].remove(i[0])
                         self.CHILDREN[B].append(i[1])
-                        edges_internal.remove([B, i[0]])
-                        edges_internal.append([B, i[1]])
-                        if B == root_child1:
-                            root_child2 = i[1]
-                            self.CHILDREN[i[1]].append(B)
-                        if B == root_child2:
+                        edges_internal.remove([B,i[0]])
+                        edges_internal.append([B,i[1]])
+                        if i[0] == root_child1:
                             root_child1 = i[1]
+                            self.CHILDREN[i[1]].append(B)
+                        if i[0] == root_child2:
+                            root_child2 = i[1]
                             self.CHILDREN[i[1]].append(B)
                     elif D not in self.CHILDREN[i[1]]:
                         self.CHILDREN[i[0]] = [A, i[1]]
@@ -559,11 +559,11 @@ class FastTree(object):
                         self.CHILDREN[D].append(i[0])
                         edges_internal.remove([D, i[1]])
                         edges_internal.append([D, i[0]])
-                        if D == root_child1:
-                            root_child2 = i[0]
-                            self.CHILDREN[i[0]].append(D)
-                        if D == root_child2:
+                        if i[1] == root_child1:
                             root_child1 = i[0]
+                            self.CHILDREN[i[0]].append(D)
+                        if i[1] == root_child2:
+                            root_child2 = i[0]
                             self.CHILDREN[i[1]].append(D)
                     else:
                         self.CHILDREN[i[0]].remove(B)
