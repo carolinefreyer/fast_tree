@@ -7,9 +7,8 @@ def run():
     tree.initialize_top_hits()
     while(len(tree.ACTIVE)>1):
         tree.neighborJoin()
+    tree.nearestNeighbourInterchange()
     tree.computeBranchLenghts()
-    # tree.nearestNeighbourInterchange()
-    # tree.computeBranchLenghts()
     newickFormat = tree.newickFormat(tree.ACTIVE[0],"")
     newickFormat += ";"
     print(newickFormat)
