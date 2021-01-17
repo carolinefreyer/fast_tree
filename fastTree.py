@@ -21,7 +21,7 @@ class FastTree(object):
         self.TOP_HITS = {}
         self.BEST_JOINS = {}
         self.BRANCH_LENGTHS = {}
-
+        self.AGES = {}
 
     def initialize_sequences(self, filename):
         """
@@ -39,6 +39,7 @@ class FastTree(object):
             self.CHILDREN[i] = []
             # Updist and variance correction zero for all leaves
             self.UPDIST[i] = 0
+            self.AGES[i] = 0
             self.VARIANCE_CORR[i] = 0
             self.ACTIVE.append(i)
             self.BRANCH_LENGTHS[i] = 1
@@ -113,7 +114,7 @@ class FastTree(object):
         :param j: node 2
         :returns: corrected distance between nodes i and j
         """
-        return min(-3/4 *np.log(1-4/3*self.uncorrected_distance(i,j)),3)
+        return min(-3 / 4 * np.log(1 - 4 / 3 * self.uncorrected_distance(i, j)), 3)
 
     def compute_variance(self, i, j):
         """
@@ -122,7 +123,7 @@ class FastTree(object):
         :param j: node 2
         :returns: variance between nodes i and j
         """
-        profile_i, profile_j= self.PROFILES[i], self.PROFILES[j]
+        profile_i, profile_j = self.PROFILES[i], self.PROFILES[j]
         return self.profile_distance(profile_i, profile_j) - self.VARIANCE_CORR[i] - self.VARIANCE_CORR[j]
 
     def compute_weight(self, i, j, n):
@@ -219,6 +220,8 @@ class FastTree(object):
         :param distances: dictionary with a key tuple (node, neighbor) and the distance as value
         :param m: number of top-hits to be initialized
         """
+        if num in self.TOP_HITS:
+            del self.TOP_HITS[num]
         sorted_distances = sorted(distances.keys(), key=lambda item: distances[item])
         for i in range(m):
             if i >= len(sorted_distances):
@@ -229,7 +232,7 @@ class FastTree(object):
                 self.BEST_JOINS.setdefault(num, neighbor)
             # add element to the top hits list
             if num not in self.TOP_HITS:
-                self.TOP_HITS.update({num:[neighbor]})
+                self.TOP_HITS.update({num: [neighbor]})
             elif neighbor not in self.TOP_HITS[num]:
                 self.TOP_HITS[num].append(neighbor)
 
@@ -246,20 +249,22 @@ class FastTree(object):
         # all nodes sorted by out distance
         srt = sorted(out_distances.keys(), key=lambda item: out_distances[item])
         m = int(math.sqrt(len(self.ACTIVE)))
-        while len(srt) > 0:
-            num_A = srt[0]
+        for num_A in srt:
+            # num_A = srt[0]
             # 2: find top-hits list for node A
             distances_A = {(num_A, j): self.neighbor_join_criterion(num_A, j) for j in self.ACTIVE if num_A != j}
             self.initialize_nodes_tophits(num_A, distances_A, m)
             distances_A = [x[1] for x in sorted(distances_A.keys(), key=lambda item: distances_A[item])]
-            srt = srt[1:]
+            # srt = srt[1:]
             # 3: check if restriction du(A,B) <= 0.75 * du(1,H_2m) holds
             for num_B in self.TOP_HITS[num_A]:
-                if self.uncorrected_distance(num_A, num_B) <= 0.5 * self.uncorrected_distance(num_A, distances_A[2*m-1]):
+                if self.uncorrected_distance(num_A, num_B) <= 0.75 * self.uncorrected_distance(num_A,
+                                                                                               distances_A[2 * m - 1]):
                     # 4: evaluate top-hits for m neighbours within node A's top-hits
-                    distances_B = {(num_B, j): self.neighbor_join_criterion(num_B, j) for j in distances_A[:2*m] if num_B != j}
+                    distances_B = {(num_B, j): self.neighbor_join_criterion(num_B, j) for j in distances_A[:2 * m] if
+                                   num_B != j}
                     self.initialize_nodes_tophits(num_B, distances_B, m)
-                    srt = srt[1:]
+                    # srt = srt[1:]
 
     def update_tophits(self, newNode, m):
         """
@@ -269,7 +274,7 @@ class FastTree(object):
         """
         seqA, seqB = self.CHILDREN[newNode]
         # compute the top-hits for the new node
-        #top_hitsA, top_hitsB = self.TOP_HITS.get(seqA), self.TOP_HITS.get(seqB)
+        # top_hitsA, top_hitsB = self.TOP_HITS.get(seqA), self.TOP_HITS.get(seqB)
         if seqA in self.TOP_HITS.keys():
             top_hitsA = self.TOP_HITS.get(seqA) if self.TOP_HITS.get(seqA) != None else []
             self.TOP_HITS.pop(seqA)
@@ -282,8 +287,8 @@ class FastTree(object):
             top_hitsB = []
         candidates = [i for i in set(top_hitsA + top_hitsB) if i != seqA and i != seqB]  # remove duplicates
         distances = {(newNode, j): self.neighbor_join_criterion(newNode, j) for j in candidates}
-        #self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
-       # m = int(math.sqrt(len(self.ACTIVE)))
+        # self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
+        # m = int(math.sqrt(len(self.ACTIVE)))
         self.initialize_nodes_tophits(newNode, distances, m)
         # self.TOP_HITS.pop(seqA), self.TOP_HITS.pop(seqB)
         # TODO: compare each of the new nodes top-hits to each other
@@ -310,26 +315,29 @@ class FastTree(object):
         :param newNode:
         :return:
         """
-        self.TOP_HITS.clear()
-        self.BEST_JOINS.clear()
+        self.AGES[newNode] = 0
+    #    i, j = self.CHILDREN[newNode]
+        # del self.TOP_HITS[i]
+        # del self.TOP_HITS[j]
+        # self.TOP_HITS.clear()
+        # self.BEST_JOINS.clear()
         # compute the top-hits for the new node
         distances_A = {(newNode, j): self.neighbor_join_criterion(newNode, j) for j in self.ACTIVE if
                        newNode != j}
-        self.initialize_nodes_tophits(newNode, distances_A, 2 * m)
-        for i in range(m):
-            keyNeighbor = self.TOP_HITS[newNode][i]
-            # distances_B = {(keyNeighbor, j): self.neighbor_join_criterion(keyNeighbor, j) for j in
-            #                self.TOP_HITS[newNode] if keyNeighbor != j}
-            distances_B = {(keyNeighbor, j): self.neighbor_join_criterion(keyNeighbor, j) for j in
-                           self.ACTIVE if keyNeighbor != j}
-            self.initialize_nodes_tophits(keyNeighbor, distances_B, m)
-        self.TOP_HITS[newNode] = self.TOP_HITS[newNode][:m]  # only save the m top hits from the new node
+        self.initialize_nodes_tophits(newNode, distances_A, m)
+        distances_A = [x[1] for x in sorted(distances_A.keys(), key=lambda item: distances_A[item])]
+        for num_B in self.TOP_HITS[newNode]:
+            distances_B = {(num_B, j): self.neighbor_join_criterion(num_B, j) for j in distances_A[:2 * m] if
+                           num_B != j}
+            self.initialize_nodes_tophits(num_B, distances_B, m)
+            self.AGES[num_B] = 0
 
-    def update_best_joins(self, i, j):
-        copy = dict(self.BEST_JOINS)
-        for x in copy:
-            if self.BEST_JOINS[x] == i or self.BEST_JOINS[x] == j or x == i or x == j:
-                del self.BEST_JOINS[x]
+    def update_best_joins(self, i, j, new):
+        del self.BEST_JOINS[i]
+        del self.BEST_JOINS[j]
+        for x in self.BEST_JOINS:
+            if self.BEST_JOINS[x] == i or self.BEST_JOINS[x] == j:
+                self.BEST_JOINS[x] = new
 
     def newickFormat(self, i, str):
         """
@@ -363,7 +371,7 @@ class FastTree(object):
             # Makes the root of the tree with children i and j.
             self.ACTIVE.remove(i), self.ACTIVE.remove(j)
             self.PROFILES[self.NODENUM] = self.merge_profiles(i, j, 0.5)
-            self.UPDIST[self.NODENUM] = 0.5*(self.UPDIST[i] + self.UPDIST[j]) + self.uncorrected_distance(i,j)
+            self.UPDIST[self.NODENUM] = 0.5 * (self.UPDIST[i] + self.UPDIST[j]) + self.uncorrected_distance(i, j)
             self.ACTIVE.append(self.NODENUM)
             self.NODENUM += 1
             return
@@ -384,7 +392,8 @@ class FastTree(object):
         self.PROFILES[new_node] = self.merge_profiles(i, j, weight=weight)
         self.UPDIST[new_node] = self.get_updist(i, j, weight)
         self.VARIANCE_CORR[new_node] = weight * self.VARIANCE_CORR[i] + (1 - weight) * self.VARIANCE_CORR[j] \
-                                      + weight * (1 - weight) * self.compute_variance(i, j)
+                                       + weight * (1 - weight) * self.compute_variance(i, j)
+        self.AGES[new_node] = 1 + max(self.AGES[i], self.AGES[j])
         self.ACTIVE.append(new_node)
         self.ACTIVE.remove(i), self.ACTIVE.remove(j)
         self.TOTAL_PROFILE = (np.array(self.TOTAL_PROFILE) * n - np.array(self.PROFILES[i]) - np.array(self.PROFILES[j])
@@ -392,19 +401,22 @@ class FastTree(object):
         # TODO: Place at appropriate position and incoorparate into joining function
         if len(self.ACTIVE) > 2:
             m = int(math.sqrt(len(self.SEQUENCES)))
-            self.update_best_joins(i,j)
-            if len(self.TOP_HITS.keys()) < 0.8 * m: # how to remove already joined nodes if refreshing is not necessary ???
+            self.update_best_joins(i, j, new_node)
+            self.update_tophits(new_node, m)
+            if len(self.TOP_HITS) < 0.8 * m or self.AGES[new_node] > 1 + np.log(m):
                 self.refresh_tophits(new_node, m)
-            else:
-                self.update_tophits(new_node, m)
+            # else:
+            #     self.update_tophits(new_node, m)
+            #     print('update')
         self.BRANCH_LENGTHS[new_node] = 1
         self.NODENUM += 1
 
         return
 
-    def computeWeightNNI(self,A,B,C,D):
+    def computeWeightNNI(self, A , B, C, D):
         weight = 1 / 2 + (self.corrected_distance(B, C) + self.corrected_distance(B, D) -
-                             self.corrected_distance(A,C) - self.corrected_distance(A, D)) / (4 * self.corrected_distance(A, B))
+                          self.corrected_distance(A, C) - self.corrected_distance(A, D)) / (
+                             4 * self.corrected_distance(A, B))
         if weight < 0:
             weight = 0
         if weight > 1:
@@ -412,9 +424,9 @@ class FastTree(object):
         return weight
 
     def recomputeProfiles(self, join1, A, B, join2, C, D):
-        weight_AB = self.computeWeightNNI(A,B,C,D)
+        weight_AB = self.computeWeightNNI(A, B, C, D)
         self.PROFILES[join1] = self.merge_profiles(A, B, weight=weight_AB)
-        weight_CD = self.computeWeightNNI(C,D,A,B)
+        weight_CD = self.computeWeightNNI(C, D, A, B)
         self.PROFILES[join2] = self.merge_profiles(C, D, weight=weight_CD)
 
     def nearestNeighbourInterchange(self):
@@ -422,9 +434,9 @@ class FastTree(object):
         Runs nearest neighbour interchange on the tree log(N) + 1 times.
         """
 
-        #Find internal edges
+        # Find internal edges
         edges_internal = []
-        #Recurses through Children starting from leafs so that children are visited before parents.
+        # Recurses through Children starting from leafs so that children are visited before parents.
         for i in self.CHILDREN:
             #skips edges coming from root
             if i != self.ACTIVE[0]:
@@ -436,7 +448,7 @@ class FastTree(object):
         root_child1, root_child2 = self.CHILDREN[self.ACTIVE[0]]
 
         end = int(np.log2(len(self.SEQUENCES)) + 1)
-        #Run nearest neighbour interchange log(N) + 1 times.
+        # Run nearest neighbour interchange log(N) + 1 times.
         for _ in range(end):
             for i in edges_internal:
                 A, B = self.CHILDREN[i[0]]
@@ -462,16 +474,16 @@ class FastTree(object):
                     else:
                         [D] = [p2 for p2 in self.CHILDREN if i[1] in self.CHILDREN[p2]]
 
-                dABCD = self.corrected_distance(A,B) + self.corrected_distance(C,D)
-                dACBD = self.corrected_distance(A,C) + self.corrected_distance(B,D)
-                dADBC = self.corrected_distance(A,D) + self.corrected_distance(B,C)
+                dABCD = self.corrected_distance(A, B) + self.corrected_distance(C, D)
+                dACBD = self.corrected_distance(A, C) + self.corrected_distance(B, D)
+                dADBC = self.corrected_distance(A, D) + self.corrected_distance(B, C)
 
-                if dABCD < min(dACBD,dADBC):
+                if dABCD < min(dACBD, dADBC):
                     print("no switch")
                     self.recomputeProfiles(i[0], A, B, i[1], C, D)
 
-                if dACBD < min(dABCD,dADBC):
-                    #Switch B and C
+                if dACBD < min(dABCD, dADBC):
+                    # Switch B and C
                     print("Switch B and C")
                     if B not in self.CHILDREN[i[0]]:
                         self.CHILDREN[i[0]] = [A, C]
@@ -491,9 +503,8 @@ class FastTree(object):
                         self.CHILDREN[i[1]].append(B)
                     self.recomputeProfiles(i[0], A, C, i[1], B, D)
 
-
                 if dADBC < min(dABCD, dACBD):
-                    #Switch B and D
+                    # Switch B and D
                     print("Switch B and D")
                     if B not in self.CHILDREN[i[0]]:
                         self.CHILDREN[i[0]] = [A, D]
@@ -530,14 +541,14 @@ class FastTree(object):
         n = len(self.SEQUENCES)
         for i in self.CHILDREN:
             if len(self.CHILDREN[i]) != 0:
-                if n !=2:
+                if n != 2:
                     weight = self.compute_weight(self.CHILDREN[i][0], self.CHILDREN[i][1], n)
                 else:
                     weight = 0.5
                 self.PROFILES[i] = self.merge_profiles(self.CHILDREN[i][0], self.CHILDREN[i][1], weight=weight)
-                n -=1
+                n -= 1
 
-    def newickFormat(self,i,res):
+    def newickFormat(self, i, res):
         """
         Recursively constructs tree in newick format.
         :param i: current node
@@ -547,8 +558,8 @@ class FastTree(object):
         if len(self.CHILDREN[i]) == 0:
             return i
         else:
-            temp1 = self.newickFormat(self.CHILDREN[i][0],res)
-            temp2 = self.newickFormat(self.CHILDREN[i][1],res)
+            temp1 = self.newickFormat(self.CHILDREN[i][0], res)
+            temp2 = self.newickFormat(self.CHILDREN[i][1], res)
             if type(temp1) is int:
                 temp1 = self.SEQ_NAMES[temp1] + ":" + str(self.BRANCH_LENGTHS[self.CHILDREN[i][0]])
             if type(temp2) is int:
@@ -589,17 +600,16 @@ class FastTree(object):
         self.recLength(self.CHILDREN[root][0])
         self.recLength(self.CHILDREN[root][1])
 
-
     def recLength(self, node):
         if len(self.CHILDREN[node]) == 0:
             # leaf
             sibling, grandparent = self.findFamilyLeaf(node)
-            d_i_g = self.corrected_distance(node,grandparent)
-            d_i_s = self.corrected_distance(node,sibling)
+            d_i_g = self.corrected_distance(node, grandparent)
+            d_i_s = self.corrected_distance(node, sibling)
             d_s_g = self.corrected_distance(sibling, grandparent)
-            self.BRANCH_LENGTHS[node] = round((d_i_g + d_i_s -d_s_g)/2,3)
+            self.BRANCH_LENGTHS[node] = round((d_i_g + d_i_s - d_s_g) / 2, 3)
         else:
-            #internal
+            # internal
             child1, child2, parent, sibling = self.findFamilyInternal(node)
             d_c1_p = self.corrected_distance(child1, parent)
             d_c2_p = self.corrected_distance(child2, parent)
@@ -607,6 +617,6 @@ class FastTree(object):
             d_c2_s = self.corrected_distance(child2, sibling)
             d_c1_c2 = self.corrected_distance(child1, child2)
             d_s_p = self.corrected_distance(sibling, parent)
-            self.BRANCH_LENGTHS[node] = round((d_c1_p + d_c2_p + d_c1_s + d_c2_s)/4 - (d_c1_c2+d_s_p)/2,3)
+            self.BRANCH_LENGTHS[node] = round((d_c1_p + d_c2_p + d_c1_s + d_c2_s) / 4 - (d_c1_c2 + d_s_p) / 2, 3)
             self.recLength(child1)
             self.recLength(child2)
