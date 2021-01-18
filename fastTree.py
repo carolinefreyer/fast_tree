@@ -379,7 +379,8 @@ class FastTree(object):
         best_join = (None, None)
         best = 0
         for num_A, num_B in self.BEST_JOINS.items():
-            join_value = self.neighbor_join_criterion(num_A, num_B)
+            join_value = self.neighbor_join_criterion(
+                num_A, num_B)
             if join_value < best:
                 best = join_value
                 best_join = (num_A, num_B)
