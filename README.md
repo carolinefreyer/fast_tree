@@ -10,5 +10,5 @@ The input file can be changed by altering the argument for the initialize_sequen
 ## Contributors
 
 Caroline Freyer 5367972
-Francesca Drummer  
+Francesca Drummer 5413990
 Pia Keukeleire 4550676  
