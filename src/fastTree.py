@@ -445,6 +445,7 @@ class FastTree(object):
         # Run nearest neighbour interchange log(N) + 1 times.
         for _ in range(end):
             edges_internal = self.get_internal_edges()
+            self.recompute_profiles_branch_lengths()
             for e in edges_internal:
                 i = list(e)
                 A, B = self.CHILDREN[i[0]]
@@ -476,12 +477,12 @@ class FastTree(object):
 
                 if dABCD < min(dACBD, dADBC):
                     print("no switch")
-                    if sorted([i[0], B]) == sorted([root_child1, root_child2]):
-                        self.recompute_profiles(i[0], A, i[1], i[1], C, D)
-                    elif sorted([i[1], D]) == sorted([root_child1, root_child2]):
-                        self.recompute_profiles(i[0], A, B, i[1], C, i[0])
-                    else:
-                        self.recompute_profiles(i[0], A, B, i[1], C, D)
+                    # if sorted([i[0], B]) == sorted([root_child1, root_child2]):
+                    #     self.recompute_profiles(i[0], A, i[1], i[1], C, D)
+                    # elif sorted([i[1], D]) == sorted([root_child1, root_child2]):
+                    #     self.recompute_profiles(i[0], A, B, i[1], C, i[0])
+                    # else:
+                    #     self.recompute_profiles(i[0], A, B, i[1], C, D)
 
                 if dACBD < min(dABCD, dADBC):
                     # Switch B and C
@@ -491,9 +492,9 @@ class FastTree(object):
                         if sorted([i[0], B]) != sorted([root_child1, root_child2]):
                             self.CHILDREN[B].remove(i[0])
                             self.CHILDREN[B].append(i[1])
-                            self.recompute_profiles(i[0], A, C, i[1], B, D)
-                        else:
-                            self.recompute_profiles(i[0], A, C, i[1], i[0], D)
+                            # self.recompute_profiles(i[0], A, C, i[1], B, D)
+                        # else:
+                            # self.recompute_profiles(i[0], A, C, i[1], i[0], D)
                         if i[0] == root_child1:
                             root_child1 = i[1]
                         if i[0] == root_child2:
@@ -503,10 +504,10 @@ class FastTree(object):
                         self.CHILDREN[i[1]].remove(C)
                         self.CHILDREN[i[0]].append(C)
                         self.CHILDREN[i[1]].append(B)
-                        if sorted([i[1], D]) == sorted([root_child1, root_child2]):
-                            self.recompute_profiles(i[0], A, C, i[1], B, i[0])
-                        else:
-                            self.recompute_profiles(i[0], A, C, i[1], B, D)
+                        # if sorted([i[1], D]) == sorted([root_child1, root_child2]):
+                        #     self.recompute_profiles(i[0], A, C, i[1], B, i[0])
+                        # else:
+                        #     self.recompute_profiles(i[0], A, C, i[1], B, D)
                     if {i[0], B} in edges_internal:
                         edges_internal.remove({i[0], B})
                     if {i[1], C} in edges_internal:
@@ -522,9 +523,9 @@ class FastTree(object):
                         if sorted([i[0], B]) != sorted([root_child1,root_child2]):
                             self.CHILDREN[B].remove(i[0])
                             self.CHILDREN[B].append(i[1])
-                            self.recompute_profiles(i[0], A, D, i[1], C, B)
-                        else:
-                            self.recompute_profiles(i[0], A, D, i[1], C, i[0])
+                            # self.recompute_profiles(i[0], A, D, i[1], C, B)
+                        # else:
+                        #     self.recompute_profiles(i[0], A, D, i[1], C, i[0])
                         if i[0] == root_child1:
                             root_child1 = i[1]
                         if i[0] == root_child2:
@@ -539,9 +540,9 @@ class FastTree(object):
                         if sorted([i[1], D]) != sorted([root_child1,root_child2]):
                             self.CHILDREN[D].remove(i[1])
                             self.CHILDREN[D].append(i[0])
-                            self.recompute_profiles(i[0], A, D, i[1], C, B)
-                        else:
-                            self.recompute_profiles(i[0], A, i[1], i[1], C, B)
+                        #     self.recompute_profiles(i[0], A, D, i[1], C, B)
+                        # else:
+                        #     self.recompute_profiles(i[0], A, i[1], i[1], C, B)
                         if i[1] == root_child1:
                             root_child1 = i[0]
                         if i[1] == root_child2:
@@ -551,7 +552,7 @@ class FastTree(object):
                         self.CHILDREN[i[1]].remove(D)
                         self.CHILDREN[i[0]].append(D)
                         self.CHILDREN[i[1]].append(B)
-                        self.recompute_profiles(i[0], A, D, i[1], C, B)
+                        # self.recompute_profiles(i[0], A, D, i[1], C, B)
                     if {i[0], B} in edges_internal:
                         edges_internal.remove({i[0], B})
                     if {i[1], D} in edges_internal:
