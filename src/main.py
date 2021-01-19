@@ -11,8 +11,7 @@ def run():
         tree.neighbor_join()
     tree.nearest_neighbour_interchange()
     tree.compute_branch_lenghts()
-    newickFormat = tree.newick_format(tree.ACTIVE[0], ";")
-    newickFormat += ";"
+    newickFormat = tree.newick_format(tree.ACTIVE[0], "") + ";"
     output_file.write(newickFormat)
     print(newickFormat)
 

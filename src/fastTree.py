@@ -581,8 +581,8 @@ class FastTree(object):
         if len(self.CHILDREN[i]) == 0:
             return i
         else:
-            temp1 = self.newickFormat(self.CHILDREN[i][0], res)
-            temp2 = self.newickFormat(self.CHILDREN[i][1], res)
+            temp1 = self.newick_format(self.CHILDREN[i][0], res)
+            temp2 = self.newick_format(self.CHILDREN[i][1], res)
             if type(temp1) is int:
                 temp1 = self.SEQ_NAMES[temp1] + ":" + str(self.BRANCH_LENGTHS[self.CHILDREN[i][0]])
             if type(temp2) is int:
@@ -641,5 +641,5 @@ class FastTree(object):
             d_c1_c2 = self.corrected_distance(child1, child2)
             d_s_p = self.corrected_distance(sibling, parent)
             self.BRANCH_LENGTHS[node] = round((d_c1_p + d_c2_p + d_c1_s + d_c2_s) / 4 - (d_c1_c2 + d_s_p) / 2, 3)
-            self.recLength(child1)
-            self.recLength(child2)
+            self.iter_branch_length(child1)
+            self.iter_branch_length(child2)
