@@ -393,7 +393,7 @@ class FastTree(object):
         if len(self.ACTIVE) > 2:
             self.update_best_joins(i, j)
             self.update_tophits(new_node, m)
-            if len(self.TOP_HITS) < 0.8 * m or self.AGES[new_node] > 1 + np.log(m):
+            if len(self.TOP_HITS) < 0.75 * m or self.AGES[new_node] > 1 + np.log(m):
                 self.refresh_tophits(new_node, m)
         self.BRANCH_LENGTHS[new_node] = 0
         self.NODENUM += 1
