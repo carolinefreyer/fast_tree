@@ -1,6 +1,6 @@
 # FastTree
 
-Implementation of the FastTree algorithm (https://academic.oup.com/mbe/article/26/7/1641/1128976) for the course CS4255.
+Implementation of the FastTree algorithm from [FastTree: Computing Large Minimum Evolution Trees with Profiles instead of a Distance Matrix](https://academic.oup.com/mbe/article/26/7/1641/1128976) by Price et. al. (2009) for the course CS4255.
 
 ## How to run
 
