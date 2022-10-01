@@ -4,7 +4,7 @@ Implementation of the FastTree algorithm (https://academic.oup.com/mbe/article/2
 
 ## How to run
 
-Running main.py in the src folder will write the phylogenetic tree corresponding to the input file in newick format to fasttree-newick-output.txt, which can be found in the data folder.
+Running `main.py` in the src folder will write the phylogenetic tree corresponding to the input file in newick format to `fasttree-newick-output.txt`, which can be found in the data folder.
 The input file can be changed by altering the argument for the initialize_sequences function, which is called inside the run function.
 
 ## Contributors
